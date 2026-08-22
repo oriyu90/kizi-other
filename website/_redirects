@@ -1,0 +1,3 @@
+/service-worker.js /service-worker-retire.js 200
+/articles/* https://kizi.pages.dev/articles/:splat 301
+/* https://kizi.pages.dev/?edition=other 302
