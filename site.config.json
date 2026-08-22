@@ -1,8 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "edition": "other",
-  "name": "kizi 非工学",
+  "name": "kizi 非工学 source",
   "origin": "https://kizi-other.pages.dev",
+  "deliveryOrigin": "https://kizi.pages.dev",
+  "repository": "oriyu90/kizi-other",
   "articleRouting": {
     "requireCategories": [],
     "excludeCategories": ["engineering"]

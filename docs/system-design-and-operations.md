@@ -1,458 +1,420 @@
-# kizi システム設計・リポジトリ・保守契約 v1
+# kizi システム設計・リポジトリ・保守契約 v2
 
 最終更新: 2026-08-22
 
-この文書は、kiziの記事を作成・検証・振り分け・公開・更新・削除する自動更新アプリを実装するための共通契約です。3つのリポジトリで同じ内容を保ちます。AIへ渡す記事原稿の形式は `docs/article-format.md`、Codexなどの作業者が必ず守る短いルールは `AGENTS.md` を正とします。
+この文書は、kiziのサイト、記事リポジトリ、Cloudflare配信層、macOS投稿アプリを同じ仕様で保つための共通契約です。`kizi`、`kizi-kougaku`、`kizi-other`の3リポジトリで同一内容を維持します。AI原稿の形式は`docs/article-format.md`、作業者向けの短い強制ルールは`AGENTS.md`を正とします。
 
-## 1. システムの目的と境界
+## 1. v2で変わること
 
-kiziは、静的HTMLをCloudflare Pagesで配信するニュースサイトです。記事本文の正本はMarkdownであり、公開用HTML・トップページ・カタログ・フィード・サイトマップは生成物です。
+読者向けサイトを`https://kizi.pages.dev`へ再統合します。記事の正本を2つのGitHubリポジトリへ分けるルールは維持し、Cloudflare R2を配信専用ストアとして追加します。
 
-自動更新アプリの責務は次の通りです。
+| 項目 | v1 | v2 |
+| --- | --- | --- |
+| 読者向けサイト | 工学版と非工学版の2オリジン | `kizi.pages.dev`の1オリジン |
+| 記事の正本 | 2記事リポジトリ | 変更なし |
+| 記事HTMLの実配信 | 各Pagesの静的ファイル | R2からkizi Pages Functionsが返す |
+| canonical | 各記事版オリジン | `https://kizi.pages.dev/articles/<ID>` |
+| ブラウザ内保存 | 2オリジンに分散 | kiziの1オリジンへ統合 |
+| 公開完了判定 | 記事版Pagesと記事版URL | GitHub Action、R2 status、kizi記事URL |
 
-1. 2つの記事リポジトリの最新状態を取得する。
-2. 記事IDとIssue番号を重複なく決める。
-3. AIへ `docs/article-format.md` を渡してMarkdown原稿を作成させる。
-4. 原稿、出典、メタデータ、翻訳、配信先を検証する。
-5. Markdownから公開成果物を決定的に生成する。
-6. すべての変更を1コミットにまとめて対象リポジトリの `main` へ反映する。
-7. Cloudflare PagesのGit連携による公開完了を確認し、失敗時に安全に戻せるよう記録する。
-
-通常の記事更新でCloudflareへファイルを直接アップロードしてはいけません。GitHubの `main` が公開状態の履歴であり、Cloudflare Pagesはその配信先です。
+Markdown形式、記事ID、Issue採番、ジャンル、翻訳、画像プール、1記事1ファイルの契約は変えません。通常の記事投稿画面にも新しいCloudflare認証入力を追加しません。
 
 ## 2. 全体構成
 
 ```text
 AI / 編集者
-    ↓ Markdown原稿
-自動更新アプリ
-    ├─ 形式・出典・ジャンル検証
-    ├─ 2版横断のID採番
-    ├─ HTML / index.json / RSS / sitemap / トップ生成
-    └─ npm run check
-          ↓ 1回のGitコミット
-GitHub main
-    ├─ oriyu90/kizi-kougaku
-    └─ oriyu90/kizi-other
-          ↓ Git連携
-Cloudflare Pages
-    ├─ kizi-kougaku.pages.dev
-    └─ kizi-other.pages.dev
-
-oriyu90/kizi → kizi.pages.dev（案内ページのみ）
+    ↓ Markdown
+kizi Publisher
+    ├─ 2記事リポジトリを同期
+    ├─ ID / Issueを横断採番
+    ├─ Markdown・HTML・index・RSS・sitemapを生成
+    ├─ npm run check
+    └─ 対象記事リポジトリのmainへ1 commitでpush
+             ↓
+GitHub Actions: Publish to kizi
+    ├─ npm run check
+    ├─ GitHub OIDC tokenを取得
+    ├─ 変更されたHTMLだけをkizi同期APIへ送る
+    └─ 版カタログを最後に確定
+             ↓
+Cloudflare R2: kizi-articles
+    ├─ articles/<SHA-256>.html
+    ├─ catalogs/engineering.json
+    ├─ catalogs/other.json
+    └─ status/<edition>/<commit>.json
+             ↓ R2 binding: ARTICLES
+kizi Pages Functions
+    ├─ /articles/<ID>
+    ├─ /api/catalog
+    ├─ /api/publish-status
+    ├─ /feed.xml
+    └─ /sitemap.xml
+             ↓
+https://kizi.pages.dev
 ```
 
-ランタイムは静的HTML、CSS、ブラウザ標準JavaScriptです。サーバー側データベースや記事APIは現在ありません。お気に入り、あとで読む、閲覧設定は各ブラウザ内に保存されます。
+読者リクエスト時にGitHubへ接続しません。通常閲覧はCloudflare Pages、Pages Functions、R2だけで完結します。GitHub障害は新規公開を遅らせますが、R2に確定済みの既存記事は読み続けられます。
 
-## 3. リポジトリ一覧と責務
+## 3. リポジトリと責務
 
-| GitHubリポジトリ | Cloudflare Pages | 公開URL | 責務 |
-| --- | --- | --- | --- |
-| `oriyu90/kizi` | `kizi` | `https://kizi.pages.dev` | 2版とStudio Riziへの案内。記事を置かない |
-| `oriyu90/kizi-kougaku` | `kizi-kougaku` | `https://kizi-kougaku.pages.dev` | `categories` に `engineering` を含む記事 |
-| `oriyu90/kizi-other` | `kizi-other` | `https://kizi-other.pages.dev` | `categories` に `engineering` を含まない記事 |
+| リポジトリ | edition | 責務 |
+| --- | --- | --- |
+| `oriyu90/kizi` | `delivery` | 統合UI、Pages Functions、R2読取・同期API、配信テスト、共通文書 |
+| `oriyu90/kizi-kougaku` | `engineering` | `categories`に`engineering`を含むMarkdown正本と生成物 |
+| `oriyu90/kizi-other` | `other` | `categories`に`engineering`を含まないMarkdown正本と生成物 |
+| `oriyu90/kizi-publisher-macos` | 該当なし | 投稿、生成、検証、Git更新、公開完了確認を行うprivateアプリ |
 
-関連リンク:
+読者向け記事URLは版にかかわらず`https://kizi.pages.dev/articles/<ID>`です。`kizi-kougaku.pages.dev`と`kizi-other.pages.dev`は正規URLではなく、移行後はkiziへの互換転送だけを行います。
 
-- GitHub owner: `oriyu90`
-- 制作者サイト: `https://studio-rizi.pages.dev/`
-- 本番ブランチ: すべて `main`
-- Pages公開ディレクトリ: すべて `website/`
-- Pagesビルドコマンド: なし。リポジトリ内の静的成果物をそのまま配信する
+雄武町の金銀鉱床の記事`2026.8.19.1`は`engineering`を含み、正本は`kizi-kougaku`だけに置きます。公開URLは`https://kizi.pages.dev/articles/2026.8.19.1`です。
 
-現在の開発端末では3リポジトリを次に置いています。ただし、自動更新アプリはこの絶対パスをハードコードせず、GitHub URLと設定ファイルから解決してください。
+## 4. 正本と生成物
+
+記事本文の唯一の編集元は`content/articles/<ID>.md`です。
 
 ```text
-/Users/yuki/適当フォルダ/kizi
-/Users/yuki/適当フォルダ/kizi-kougaku
-/Users/yuki/適当フォルダ/kizi-other
+content/articles/<ID>.md               編集する正本
+website/articles/<ID>.html             Publisher生成物
+website/articles/index.json            版カタログの入力
+website/index.html                      記事版の検証・互換用生成物
+website/feed.xml                        記事版の検証・互換用生成物
+website/sitemap.xml                     記事版の検証・互換用生成物
+scripts/sync-delivery.mjs               R2差分同期クライアント
+.github/workflows/publish-to-kizi.yml  自動同期起点
 ```
 
-## 4. 設定の正本
+`kizi`リポジトリにはMarkdown正本と記事HTMLを保存しません。R2も編集元ではなく、GitHubの確定コミットから再生成できる配信キャッシュです。
 
-各リポジトリの `site.config.json` が版固有設定の正本です。全リポジトリに共通するのは `schemaVersion`、`edition`、`name`、`origin` です。記事版には `articleRouting`、案内版には `publishesArticles: false` を置きます。
+## 5. `site.config.json`契約
+
+v2では`schemaVersion`を`2`にします。Publisherは未知のschemaVersionを黙って処理しません。
+
+### 配信リポジトリ
 
 ```json
 {
-  "schemaVersion": 1,
-  "edition": "engineering | other",
-  "name": "表示名",
-  "origin": "https://公開オリジン",
+  "schemaVersion": 2,
+  "edition": "delivery",
+  "name": "kizi",
+  "origin": "https://kizi.pages.dev",
+  "publishesArticles": true,
+  "articleSources": [
+    {"edition": "engineering", "repository": "oriyu90/kizi-kougaku"},
+    {"edition": "other", "repository": "oriyu90/kizi-other"}
+  ],
+  "delivery": {
+    "store": "cloudflare-r2",
+    "bucket": "kizi-articles",
+    "binding": "ARTICLES",
+    "syncAudience": "https://kizi.pages.dev/api/sync"
+  }
+}
+```
+
+### 記事リポジトリ
+
+```json
+{
+  "schemaVersion": 2,
+  "edition": "engineering",
+  "name": "kizi 工学 source",
+  "origin": "https://kizi-kougaku.pages.dev",
+  "deliveryOrigin": "https://kizi.pages.dev",
+  "repository": "oriyu90/kizi-kougaku",
   "articleRouting": {
-    "requireCategories": [],
+    "requireCategories": ["engineering"],
     "excludeCategories": []
   }
 }
 ```
 
-案内版は次の形です。
+非工学版は`edition: other`、`repository: oriyu90/kizi-other`、`excludeCategories: ["engineering"]`です。記事HTMLのcanonical、OGP URL、JSON-LD URLは`origin`ではなく`deliveryOrigin`を使います。
+
+## 6. 記事ID、Issue、ジャンル
+
+- 記事IDは`YYYY.M.D.N`で、Asia/Tokyoの公開日と当日内連番を表します。
+- IDとIssueは2記事リポジトリの和集合で一意にします。
+- ファイル名、front matter、カタログID、HTMLの`data-article-slug`を一致させます。
+- `categories`のどこかに`engineering`があれば工学版、それ以外は非工学版です。
+- `categories[0]`は主ジャンル、`heroPool`は主ジャンルと一致させます。
+- 一度公開したIDを別記事へ再利用しません。
+
+## 7. R2オブジェクト契約
+
+バケット名は`kizi-articles`、Pages Functions binding名は`ARTICLES`です。
+
+```text
+articles/<artifactHash>.html
+catalogs/engineering.json
+catalogs/other.json
+status/<edition>/<40桁commit>.json
+staging/<edition>/<commit>/session.json
+staging/<edition>/<commit>/receipts/<batch>.json
+```
+
+`artifactHash`は記事HTMLのUTF-8バイト列に対する小文字64桁のSHA-256です。記事オブジェクトはcontent-addressedで不変とし、同じ内容を再アップロードしません。
+
+確定版カタログは`schemaVersion: 2`で、少なくとも次を持ちます。
 
 ```json
 {
-  "schemaVersion": 1,
-  "edition": "directory",
-  "name": "kizi directory",
-  "origin": "https://kizi.pages.dev",
-  "publishesArticles": false
+  "schemaVersion": 2,
+  "edition": "engineering",
+  "source": {
+    "repository": "oriyu90/kizi-kougaku",
+    "commit": "40桁SHA"
+  },
+  "publishedAt": "ISO 8601",
+  "categories": [],
+  "imagePools": {},
+  "articles": [
+    {
+      "id": "2026.8.19.1",
+      "edition": "engineering",
+      "url": "/articles/2026.8.19.1",
+      "artifactHash": "64桁SHA-256",
+      "storageKey": "articles/<artifactHash>.html"
+    }
+  ]
 }
 ```
 
-自動更新アプリはリポジトリ名や公開URLから配信ルールを推測せず、このファイルを読みます。未知の `schemaVersion` は無視して処理を続けず、対応版へアプリを更新するまで停止します。
+記事追加・更新時は新しい記事オブジェクトを先に保存し、全バッチ成功後に`catalogs/<edition>.json`を最後に置き換えます。途中失敗時は旧カタログが残るため、未完成版は読者から参照されません。削除時はカタログから先に外し、到達不能オブジェクトは後日のGCまで残します。
 
-## 5. ディレクトリとデータの所有関係
+## 8. GitHub ActionsとOIDC同期
 
-```text
-AGENTS.md                              共通の不変ルール
-docs/article-format.md                 AI原稿・Markdown契約
-docs/system-design-and-operations.md   この設計・運用契約
-site.config.json                       版固有のURL・振り分け条件
-content/articles/<ID>.md               記事の正本。1記事1ファイル
-scripts/next-article-id.mjs             単一リポジトリ用の補助採番
-scripts/validate-articles.mjs           公開前の最低限の構造検証
-website/index.html                      トップページ生成物
-website/articles/<ID>.html              記事ページ生成物
-website/articles/index.json             公開記事カタログと画像プール
-website/feed.xml                        RSS生成物
-website/sitemap.xml                     サイトマップ生成物
-website/robots.txt                      クローラー設定
-website/manifest.webmanifest            PWA設定
-website/service-worker.js               PWAキャッシュ処理
-website/assets/                         共通UI、画像、アイコン
-website/favorites.html                  お気に入り一覧
-website/read-later.html                 あとで読む一覧
+記事リポジトリのworkflow名は`Publish to kizi`、job名は`delivery`に固定します。
+
+必要な権限は次だけです。
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
 ```
 
-Markdownだけが記事本文の編集元です。`website/articles/<ID>.html` を直接編集しても、次の生成で上書きされるものとして扱います。共通UIを変えた場合は、記事を持つ2リポジトリへ同じ変更を反映し、両方で検証します。
+Cloudflare API token、R2 access key、共有HMAC secretをGitHubへ保存しません。Actionはaudience `https://kizi.pages.dev/api/sync` のGitHub OIDC tokenを取得します。kizi側は署名、issuer、audience、有効期限、`repository_owner`、`repository`、`ref == refs/heads/main`、`sha`を検証します。
 
-## 6. 記事ID、Issue、URL
+同期は次の3段階です。
 
-- 記事IDは `YYYY.M.D.N`。日付は `Asia/Tokyo` の公開日、`N` はその日の1始まり連番です。
-- IDは2つの記事リポジトリを合わせて一意にします。
-- ファイル名、front matterの `id`、カタログの `id`、HTMLの識別子を一致させます。
-- 公開URLは `<site.config.origin>/articles/<ID>` です。ソース上のファイルは `<ID>.html` ですが、公開リンクでは拡張子を付けません。
-- `issue` は画面上の通し番号です。v1の更新アプリでは両版の公開記事を合わせた最大値に1を足し、重複させません。URLや永続保存のキーには使いません。
-- 一度公開したIDを別記事へ再利用しません。公開日を直す必要がある場合も、既存URLを維持するか、明示的な移転処理を行います。
+1. `POST /api/sync/begin`: 版、commit、全カタログ、各HTMLのSHA-256を送る。現在の確定カタログと比較し、変更・追加されたIDだけを返す。
+2. `POST /api/sync/articles`: 指定されたIDのHTMLを最大12件ずつ送る。サーバーがSHA-256を再計算し、一致したオブジェクトだけ保存する。
+3. `POST /api/sync/finalize`: 全receipt、他版とのID非重複を確認し、版カタログとstatusを確定する。
 
-既存の `npm run article:next-id -- YYYY-MM-DD` は、そのリポジトリの `index.json` だけを見る補助コマンドです。自動更新アプリの正式な採番には使わず、必ず工学版と非工学版の和集合から次番号を計算します。
+再試行は冪等です。同じcommitと同じbatchを再送しても同じcontent-addressed keyとreceiptへ上書きされます。`begin`後に失敗した場合、読者向けカタログは変わりません。
 
-## 7. ジャンルと版の振り分け
+Actionは同期前に`git ls-remote origin refs/heads/main`を実行し、`GITHUB_SHA`が現在のmainでなければ停止します。kizi側も確定カタログのGitHub `runId`より古いworkflow runを拒否し、古いActionの再実行で新しいカタログを巻き戻さないようにします。
 
-許可するジャンルIDは `culture`、`economy`、`engineering`、`politics`、`science` の5つです。
+## 9. Pages Functions公開API
 
-```text
-categories に engineering がある   → kizi-kougaku
-categories に engineering がない   → kizi-other
-```
+| API | 用途 | キャッシュ |
+| --- | --- | --- |
+| `GET /articles/<ID>` | 2カタログからIDを解決しR2記事HTMLを返す | 短いbrowser cacheとstale許容 |
+| `GET /api/catalog` | 2版を重複確認して日付・order降順に統合 | 60秒 |
+| `GET /api/publish-status?edition=&commit=` | Publisherの公開完了確認 | `no-store` |
+| `GET /api/health` | R2 bindingと各カタログのcommit確認 | `no-store` |
+| `GET /feed.xml` | 統合RSS | 300秒 |
+| `GET /sitemap.xml` | 統合sitemap | 300秒 |
 
-- `categories[0]` は主ジャンルです。
-- `heroPool` は `categories[0]` と一致させます。
-- 工学判定は主ジャンルだけでなく、`categories` 全体を見ます。
-- 通常状態では同じIDを両版へ置きません。
-- 雄武町の金銀鉱床の記事 `2026.8.19.1` は `engineering` を含むため工学版だけに置きます。
+存在しない記事は404、カタログにはあるがR2本文が欠ける異常は503で返します。`.html`付き旧URLは拡張子なしURLへ301転送します。記事応答にはcontent type、ETag、nosniff、CSPを付けます。
 
-公開後に `engineering` の有無を変える操作は、単なる記事更新ではなく「版移転」です。重複公開を避ける既定手順は、旧版から削除して公開完了を確認した後、新版へ追加する順序です。この間は短時間404になり得るため、アプリは利用者へ警告し、旧URLから新オリジンへのリダイレクト追加を選べるようにします。
+## 10. Publisher次版の実装契約
 
-## 8. 原稿から公開までの状態
+現行配布版v0.1.1のGit操作、safeStorage、journal、detached worktree、競合検出は維持します。次版では投稿入力やMarkdown契約を変えず、公開後の工程だけを次へ変更します。
 
-推奨する状態遷移は次の通りです。
+1. 起動時と公開前に`kizi`、`kizi-kougaku`、`kizi-other`の`site.config.json`を読み、schemaVersion 2とリポジトリ組を確認する。
+2. 2記事版の最新`main`を横断してIDとIssueを採番する。
+3. 記事HTMLのcanonical、OGP、JSON-LD、保存URLを`deliveryOrigin`で生成する。
+4. 対象記事リポジトリで`npm run check`を通し、1commitで`main`へpushする。
+5. GitHub Check Run `Publish to kizi / delivery`が対象commitで成功するまで待つ。
+6. `GET https://kizi.pages.dev/api/publish-status?edition=<edition>&commit=<sha>`が200かつ同じcommitを返すことを確認する。
+7. `GET https://kizi.pages.dev/articles/<ID>`が200、canonicalがkizi、記事IDが一致することを確認する。
+8. ここまで成功した時だけjournalを`published`にする。
 
-```text
-draft（アプリ内）
-  → validated（原稿検証済み）
-  → previewed（生成結果を確認済み）
-  → publishing（Git更新・Pages公開待ち）
-  → published（本番確認済み）
-  → superseded / unpublished（更新・公開終了）
-```
+Publisher自身はR2へアップロードせず、Cloudflare資格情報を保存しません。GitHub Actionが遅延・失敗した場合は`push済み・配信同期待ち`として記録し、同じcommitのCheck Runとstatusを再確認します。新しい記事commitを重ねて回避しません。
 
-現在のリポジトリ検証は、`content/articles/` にあるMarkdownがすべてカタログと公開HTMLに対応することを要求します。そのため `status: draft` の原稿を `main` に保存してはいけません。下書きはアプリ自身の保存領域、専用ブランチ、またはPull Requestで管理し、公開コミットへ入れる時点で `status: published` にします。
-
-## 9. 新規公開アルゴリズム
-
-1. 工学版と非工学版の `main` の最新コミットSHAを取得する。
-2. 両方の `website/articles/index.json` と `content/articles/*.md` を読み、IDとIssueの和集合を作る。
-3. 希望公開日から未使用のIDを採番する。
-4. AIへ `docs/article-format.md` 全体、調査資料、採番済みID、Issueを渡す。
-5. AIの出力がMarkdown 1ファイルだけであることを確認する。
-6. front matter、本文構造、URL、出典、禁止記法、ジャンルを検証する。
-7. `site.config.json` に従って配信先を1つに決める。
-8. 日本語正本から5言語の翻訳を生成・検証する。
-9. Markdownとすべての公開成果物を一時作業領域に生成する。
-10. 対象リポジトリで `npm run check` を実行する。
-11. 開始時の `main` SHAが変わっていないことを確認する。変わっていれば最新化し、IDを再計算して生成し直す。
-12. 全ファイルを1つのGitコミットにし、`main` を更新する。
-13. Cloudflare Pagesの対象コミットが成功し、本番URLが200、canonicalが正しいことを確認する。
-14. 記事ID、対象版、GitコミットSHA、公開URL、公開確認時刻をアプリの履歴へ保存する。
-
-GitHub APIで実装する場合、Contents APIで複数ファイルを1つずつ `main` に書き込むと、途中状態がデプロイされます。blob、tree、commitを作成して最後にbranch refを更新するGit Data API相当の処理、またはローカルclone上の1回の `git commit` と `git push` を使います。
-
-## 10. 更新、公開終了、削除
-
-### 記事更新
-
-- IDと公開URLは維持する。
-- `updatedAt` を更新し、必要なら表示上の最終更新日も同期する。
-- Markdownから全成果物を再生成する。
-- タイトルや要約変更時はHTML、トップ、カタログ、RSS、OGP、JSON-LDを同期する。
-- 翻訳は日本語正本との差分を反映し、古い翻訳を残さない。
-
-### 公開終了
-
-- 通常は履歴保全のため完全削除より、明示的な公開終了ページまたは適切な転送を優先する。
-- 検索から外す場合はカタログ、トップ、RSS、サイトマップから除外し、ページ側の検索制御も揃える。
-
-### 完全削除
-
-- Markdown、記事HTML、カタログ項目、トップ掲載、RSS、サイトマップ、Service Workerのプリキャッシュ、旧リダイレクトを同じコミットで更新する。
-- 法務・安全上の緊急削除を除き、Git履歴自体は書き換えない。
-- 削除後に対象URL、一覧、RSS、サイトマップを確認する。
-
-## 11. 公開成果物の同期契約
-
-記事を公開・更新・削除したときは、必要に応じて次を同じコミットで同期します。
-
-| 成果物 | 同期内容 |
-| --- | --- |
-| `content/articles/<ID>.md` | 日本語の正本とメタデータ |
-| `website/articles/<ID>.html` | 本文、5翻訳、目次、保存・共有UI、SEO |
-| `website/articles/index.json` | 一覧、ジャンル、要約、URL、読了時間 |
-| `website/index.html` | 最新記事、ジャンル件数、空状態 |
-| `website/feed.xml` | 公開記事のRSS項目 |
-| `website/sitemap.xml` | 公開URLと更新日 |
-| `website/service-worker.js` | プリキャッシュ対象やアセット版が変わる場合 |
-| `website/_redirects` | URL移転や旧URL互換が必要な場合 |
-
-生成は決定的であるべきです。同じMarkdown、同じテンプレート、同じ設定からは、生成時刻など意図した項目を除いて同じ成果物を得られるようにします。
-
-## 12. 記事HTMLと多言語の契約
-
-- 日本語を基準言語とします。
-- 対応言語は `ja`、`en`、`pt`、`de`、`zh-CN`、`ar` です。
-- 日本語以外の5翻訳は同じ記事HTML内に各1つ置き、`data-article-translation="<language>"` で識別します。
-- アラビア語では文書方向をRTLに切り替えます。
-- 初回言語はブラウザ設定から選び、未対応言語は日本語へ戻します。
-- 翻訳が欠けた場合は日本語を表示しますが、公開前検証では翻訳欠落をエラーにします。
-- 固有名詞、数値、単位、出典URL、既知／未確定の区別を翻訳で変えません。
-
-記事HTMLには少なくとも記事IDを示す `data-article-slug`、お気に入り操作 `data-favorite-toggle`、あとで読む操作 `data-read-later-toggle` を含めます。
-
-## 13. トップ画像の契約
-
-- 本文画像は禁止です。
-- `website/articles/index.json` の `imagePools` に5ジャンル×4枚を登録します。
-- 画像ファイルは `website/assets/images/` に置きます。
-- トップ画像は `heroPool` の4枚からブラウザ側でランダムに選びます。
-- ファイルを差し替える場合は、両記事版の画像、カタログ、キャッシュを同期します。
-- 画像名の変更や削除では、古いService Workerキャッシュからの参照にも注意します。
-
-## 14. SEO、SNS、配信メタデータ
-
-各公開記事で次を生成・検証します。
-
-- 一意な `<title>` とdescription
-- `site.config.origin` に一致するcanonical URL
-- Open Graphのtitle、description、URL、type、image
-- X/Twitterカード
-- NewsArticleまたはArticleのJSON-LD
-- `lang` と翻訳表示時の言語・方向
-- RSS項目
-- sitemapのURLと更新日
-- 有効なrobots設定
-
-別オリジンへ記事を移す場合はcanonicalとSNS URLを必ず新しい版へ変えます。案内版 `kizi.pages.dev` に記事canonicalを向けません。
-
-## 15. ブラウザ内データ契約
-
-閲覧設定、お気に入り、あとで読むは `website/assets/reader.js` が管理します。
-
-### IndexedDB
-
-- DB名: `kizi-reader`
-- DB version: `2`
-- `settings` store: keyPath `key`、固定キー `reader`
-- `favorites` store: keyPath `slug`
-- `readLater` store: keyPath `slug`
-
-設定レコードの現在の `settingsSchema` は `2` です。主なフィールドは次の通りです。
+Publisher履歴へ次を追加します。
 
 ```json
 {
-  "key": "reader",
-  "settingsSchema": 2,
-  "language": "ja",
-  "articleFont": "gothic",
-  "articleScale": 1,
-  "articleBold": false,
-  "uiScale": 1,
-  "controlScale": 1,
-  "themeMode": "system",
-  "accentColor": "orange"
+  "delivery": {
+    "workflow": "Publish to kizi",
+    "edition": "engineering",
+    "sourceCommit": "40桁SHA",
+    "syncState": "pending | succeeded | failed",
+    "statusUrl": "https://kizi.pages.dev/api/publish-status?...",
+    "publicUrl": "https://kizi.pages.dev/articles/<ID>",
+    "verifiedAt": "ISO 8601またはnull"
+  }
 }
 ```
 
-お気に入りとあとで読むのレコード形は共通です。
+完全削除では対象記事リポジトリから正本と生成物を1commitで削除し、Action成功後にkizi URLが404、カタログ・RSS・sitemapから消えたことを確認します。既存記事編集、公開終了、版移転、revert専用UIはv0.1.1では未実装であり、実装前提にしません。
 
-```json
-{
-  "slug": "2026.8.19.1",
-  "url": "/articles/2026.8.19.1",
-  "title": "記事タイトル",
-  "date": "2026-08-19",
-  "savedAt": "ISO 8601日時"
-}
+## 11. 公開状態と完了条件
+
+```text
+draft
+  → validated
+  → previewed
+  → source_pushed
+  → delivery_syncing
+  → delivery_catalog_committed
+  → public_verified
+  → published
 ```
 
-IndexedDBが使えない場合はlocalStorageの `kizi-reader-fallback` を代替保存に使います。テーマ互換用に `kizi-theme-mode` も使います。
+`git push`成功、Action開始、R2への記事putのいずれも単独では公開完了ではありません。対象commitのstatusと本番HTTP確認が必要です。
 
-重要: IndexedDBとlocalStorageはオリジン単位です。`kizi-kougaku.pages.dev` と `kizi-other.pages.dev` のお気に入り・あとで読む・設定は自動共有されません。将来、更新アプリやアカウント同期で統合する場合は、両オリジンのデータ移行またはエクスポート／インポート仕様を別途設計します。
+## 12. 整合性、競合、再試行
 
-DB名、store名、keyPath、レコードキーを変更すると既存ユーザーの保存データが読めなくなります。変更時はDB versionと `settingsSchema` を上げ、`onupgradeneeded` で後方互換の移行を実装します。
+- push直前に2記事版のremote SHAを再確認し、変化していれば採番・生成をやり直します。
+- force pushは禁止です。
+- 同じIDを両版へ含むカタログは`finalize`で拒否します。
+- Action再実行は同じcommitを使います。
+- R2 catalogは版ごとの原子的な切替単位です。2版を同時更新する操作では一時的に片方だけ新しくなるため、版移転は旧版削除の確定後に新版追加を行います。
+- statusのcommitがpushしたcommitと異なる場合は成功扱いにしません。
 
-## 16. PWAとキャッシュ
+## 13. SEO、SNS、旧URL
 
-- `manifest.webmanifest` と192px、512px、maskableアイコンを維持します。
-- Service Workerは同一オリジンのGETを扱い、ナビゲーションはネットワーク優先、静的資産はキャッシュ利用です。
-- CSS、JavaScript、アイコン、記事、一覧ページを変更して古い表示が残り得る場合は、アセットのクエリ版と `CACHE_NAME` を更新します。
-- 記事を削除した場合はプリキャッシュ一覧からも除きます。
-- Service Workerのinstallで404資産が1つでもあると更新に失敗するため、公開前に全 `CORE_ASSETS` を確認します。
-- 案内版には旧記事サイトのService Workerを残しません。
+- canonical、`og:url`、NewsArticle JSON-LD、BreadcrumbList、共有URLはkiziオリジンへ統一します。
+- OGP画像は`https://kizi.pages.dev/assets/images/...`を使います。
+- 統合RSSとsitemapはR2の確定カタログから生成します。
+- 記事版Pagesの`/articles/*`は対応するkizi URLへ301転送します。
+- 記事版トップはkiziの`/?edition=engineering#latest`または`/?edition=other#latest`へ転送できます。
+- 旧記事版で登録済みのService Workerを残さないため、`/service-worker.js`だけは同一オリジンのretire scriptへrewriteし、旧cache削除とunregisterを行います。
+- 転送開始前にkizi側の対象記事が200であることを確認します。
 
-## 17. 対応ブラウザとアクセシビリティ
+## 14. ブラウザ内データとPWA
 
-- 標準HTML、CSS、JavaScript APIを優先し、特定ブラウザだけの技術を必須にしません。
-- IndexedDB失敗時はlocalStorage、`ResizeObserver` がない場合はscroll/resize、テーマ変更監視では新旧イベントAPIのフォールバックを維持します。
-- JavaScript無効時でも記事本文と基本リンクを読める構造を維持します。
-- キーボード操作、フォーカス表示、ARIA、十分なタッチ領域、RTL、ズーム、prefers-reduced-motionを壊しません。
-- 小型画面から8Kまで、本文の読みやすい最大行長を守り、単純な画面倍率だけで引き伸ばしません。
+閲覧設定、お気に入り、あとで読むはkiziオリジンのIndexedDB `kizi-reader`で管理します。DB version 2、settings schema 2、store名とkeyPathはv1から変えません。これにより新規保存は1オリジンへ統合されます。
 
-## 18. 検証と公開完了条件
+旧2オリジンのIndexedDBは同一生成元ポリシーによりkiziから直接読めません。自動移行は行わず、必要になった場合は旧サイト上の明示的なexportとkizi側importを別仕様で追加します。
 
-最低限、対象の記事版で次を実行します。
+Service WorkerはUI shellだけを事前キャッシュします。記事一覧と記事本文はネットワーク優先で、成功応答を実行時キャッシュできます。特定記事を`CORE_ASSETS`へ固定しません。R2やFunctions障害時に、既読記事のブラウザキャッシュがあれば利用できます。
+
+## 15. 対応ブラウザとアクセシビリティ
+
+- 標準HTML、CSS、JavaScript、IndexedDBを優先します。
+- IndexedDB失敗時はlocalStorage、ResizeObserver不在時はscroll/resizeへフォールバックします。
+- JavaScript無効時でもトップに埋め込まれた最新記事と記事HTML本文を読める構造を保ちます。
+- Safari、Chrome、Edge、Firefoxの現行メジャー、320 CSS pxから8K、LTR/RTL、200%ズームを回帰対象にします。
+- キーボード、focus ring、44 CSS px以上の操作領域、prefers-reduced-motionを維持します。
+
+## 16. Cloudflare初期構築
+
+初回だけ次を行います。
+
+1. R2 bucket `kizi-articles`を作成する。
+2. kizi Pages projectへR2 binding `ARTICLES`を設定する。
+3. `wrangler.jsonc`をPages設定の正本としてデプロイする。
+4. kizi Pages Functionsを本番反映する。
+5. 工学版の既存記事をActionで同期する。
+6. `/api/health`、`/api/catalog`、既存記事、RSS、sitemapを確認する。
+7. 最後に旧記事版URLの転送を有効化する。
+
+日常の記事公開ではWranglerやCloudflareログインを要求しません。必要なのはPublisherが使うGitHub認証だけです。
+
+## 17. 検証
+
+### kizi配信リポジトリ
 
 ```sh
 npm run check
+wrangler pages dev website
 ```
 
-現行チェックはJavaScript構文、記事MarkdownとHTMLの1対1対応、ID、日付、ジャンル、版ルール、翻訳、canonical、保存ボタン、5×4画像を確認します。自動更新アプリはこれに加えて次を確認します。
+確認対象:
 
-- 両リポジトリを横断したIDとIssueの重複
-- Markdownリンクと出典URLの妥当性
-- HTMLの安全なサニタイズ
-- トップ、記事、404、お気に入り、あとで読むの表示
-- RSSとsitemapのXML妥当性
-- manifestとService Workerの全参照先
-- canonical、OGP、JSON-LDの内容
-- ライト／ダーク、6言語、LTR／RTL、代表的な画面幅
-- 本番デプロイが対象コミットSHAで成功したこと
-- 公開URLが期待するHTTP状態と内容を返すこと
+- Functionsとbrowser JavaScriptの構文
+- catalog正規化、版ルーティング、SHA-256、統合順序
+- R2未設定、空カタログ、存在しない記事、欠落オブジェクトのHTTP状態
+- RSS、sitemap、CSP、ETag、HEAD、`.html`転送
+- ライト／ダーク、6言語、PWA、IndexedDB、Safariを含む代表ブラウザ
 
-`git push` の成功だけを公開完了とは扱いません。Pagesのデプロイ成功と本番HTTP確認までを `published` とします。
+### 記事リポジトリ
 
-## 19. 競合、再試行、冪等性
+```sh
+npm run check
+node --check scripts/sync-delivery.mjs
+```
 
-- 公開処理の開始時に各 `main` のSHAを記録し、push直前に再確認します。
-- SHAが変わった場合は上書きやforce pushをせず、最新状態から採番・生成・検証をやり直します。
-- GitHubのnon-fast-forward、409、422は競合として扱い、同じIDをそのまま再送しません。
-- 同じ公開操作を再実行しても、同じIDの記事が二重登録されないよう、操作IDと対象記事IDを履歴に持ちます。
-- ネットワーク失敗後は、まずGitHubとPagesの現状を照合し、未反映と確認できた処理だけ再実行します。
-- `main` へのforce pushは禁止です。
+検証器はMarkdownとHTMLの1対1、記事ID、版ルール、翻訳、5ジャンル×4画像に加え、canonicalが`deliveryOrigin`であることを確認します。
 
-## 20. 認証とセキュリティ
+## 18. 障害対応
 
-- 通常公開に必要なのは対象GitHubリポジトリへcommit/pushできる認証です。CloudflareはGit連携で自動公開されるため、日常の更新にCloudflare書き込み権限を持たせる必要はありません。
-- デプロイ状況をAPI監視する場合は、読み取りだけの最小権限を使います。
-- トークンはOSの安全な資格情報ストアまたは実行環境のsecretへ保存し、リポジトリ、設定JSON、ログ、生成HTMLへ書きません。
-- AIへ認証情報、非公開Git情報、不要な個人情報を渡しません。
-- Markdownのraw HTML、script、iframe、本文画像を拒否し、生成HTMLではURLとテキストをエスケープします。
-- 外部リンクは許可方式を明示し、危険なURL schemeを拒否します。
-- ログでは記事ID、工程、コミットSHA、結果を記録し、トークンや原文中の機密情報を伏せます。
+### Action失敗
 
-## 21. 障害対応とロールバック
+1. 対象commitの`npm run check`結果を確認する。
+2. OIDC permission、audience、repository、ref、shaを確認する。
+3. begin、articles、finalizeのどこで失敗したかAction logで特定する。
+4. 原因修正後、同じcommitのworkflowを再実行する。記事commitを作り直さない。
 
-### Pagesの公開失敗
+### R2同期途中の失敗
 
-1. 対象コミットSHAとPagesの失敗ログを確認する。
-2. `npm run check` を同じコミットで再現する。
-3. 設定、欠落ファイル、Service Workerのプリキャッシュ、HTML参照先を確認する。
-4. 修正を新しいコミットでpushする。
-
-### 表示崩れやJavaScript障害
-
-1. ライト／ダーク、代表画面幅、6言語で再現する。
-2. ブラウザコンソールとネットワーク404を確認する。
-3. 共通UIの問題なら工学版・非工学版の両方を修正する。
-4. キャッシュ原因ならアセット版とService Workerのcache名を更新する。
+確定カタログは旧版のままなので、読者影響は原則ありません。stagingと未参照content-addressed objectは後で削除できます。先に手動でcatalogだけ切り替えてはいけません。
 
 ### 誤公開
 
-- 履歴を書き換えず、原則 `git revert <bad-commit>` を新しいコミットとしてpushします。
-- 記事だけを直せる場合は修正コミットを優先します。
-- ロールバック後もPagesの対象コミットと本番URLを確認します。
-- リポジトリ、Pagesプロジェクト、広いディレクトリを削除する操作を自動化しません。
+Git履歴を書き換えず`git revert <commit>`を新しいcommitとしてpushします。Actionがrevert後のカタログを確定し、本番URLを確認するまで完了にしません。
 
-## 22. 定期保守
+### kizi Functions障害
+
+直前の正常な`kizi`commitをrevertしてPagesへ再デプロイします。R2記事とカタログは消さないため、Function復旧後に同じ公開状態へ戻せます。
+
+## 19. R2保守とGC
+
+content-addressed記事は更新・削除後も残るため、定期GCを行います。
+
+1. `catalogs/engineering.json`と`catalogs/other.json`が参照する`storageKey`集合を作る。
+2. 直近30日以内のobjectとstagingは保護する。
+3. どちらにも該当しない`articles/*`だけを削除候補として一覧化する。
+4. dry-runを保存し、別実行で明示的に削除する。
+
+GCは通常のPublisher公開処理へ混ぜません。catalogとstatusを削除対象に含めません。
+
+## 20. 定期保守
 
 ### 記事公開ごと
 
-- 両版の最新状態、ID、Issue、ジャンル、出典を確認する。
-- `npm run check` と生成差分を確認する。
-- 本番デプロイとURLを確認する。
+- 2版のIDとIssue重複、routing、`npm run check`を確認する。
+- Action、publish-status、kizi本番記事を確認する。
+- canonical、共有URL、RSS、sitemapを確認する。
 
 ### 月次
 
-- トップ、最新記事、RSS、sitemap、robots、manifest、404を確認する。
-- 外部リンク切れと画像404を確認する。
-- 工学版と非工学版の共通UI差分を確認する。
-- Service Workerの古い参照とキャッシュ版を確認する。
+- `/api/health`と2カタログのcommitをGitHub mainと照合する。
+- R2容量、Class A/B操作数、Functionsエラー率を確認する。
+- 外部リンク、画像、manifest、Service Workerを確認する。
+- 失敗したstaging sessionを一覧化する。
 
-### 四半期または大きな変更時
+### 四半期または大変更時
 
-- 代表ブラウザ、モバイル、RTL、キーボード、ズームで回帰確認する。
-- IndexedDB移行とfallbackを確認する。
-- GitHub／Cloudflare連携の権限を見直す。
-- 記事形式、設定、カタログのschemaVersionとアプリ対応範囲を確認する。
-- 復旧手順としてgit revertから本番反映までを確認する。
+- Safari、Chrome、Edge、Firefox、モバイル、RTL、キーボード、ズームで回帰確認する。
+- GitHub OIDC issuer/JWKS仕様とActions権限を確認する。
+- R2 GCをdry-runする。
+- git revertから本番復旧まで訓練する。
+- article、site config、catalog、IndexedDB、journalの各schemaVersionを確認する。
 
-## 23. スキーマと互換性の変更
+## 21. Publisher引き継ぎ
 
-- `docs/article-format.md`、front matter、`site.config.json`、`index.json`、IndexedDBは別々のスキーマです。
-- 必須項目の追加、意味変更、削除では対応する `schemaVersion` を上げます。
-- スキーマ変更は、文書、生成器、検証器、既存データ移行、テストを同じ変更で行います。
-- 自動更新アプリは未対応の新しいschemaVersionを黙って書き換えません。
-- テンプレートや生成器を作る際は生成器バージョンをアプリ履歴へ記録し、どの版で生成したか追跡可能にします。
+Publisherの正本はprivate repository `oriyu90/kizi-publisher-macos`の`main`です。変更前に同repoの`README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md`、最新Releaseを確認します。
 
-## 24. 自動更新アプリの最小機能
+v0.1.1の既存要件である、専用clone、detached worktree、file lock、atomic journal、remote SHA確認、Git recovery ref、safeStorage、secret非出力、force push禁止を維持します。v2対応では本章10のdelivery状態と確認URLを追加し、既存journalを読み込める後方互換migrationを実装します。
 
-v1で必要な機能は次の通りです。
+Publisherの契約、Release、journal schemaを変更した場合、`AGENTS.md`のcontinuity節とこの文書を3リポジトリで同じ更新単位に同期します。
 
-- 3リポジトリの接続確認と最新化
-- 2記事版を横断した次ID・Issue取得
-- AI用プロンプトへの記事形式契約の組み込み
-- Markdown入力、検証、プレビュー、編集
-- ジャンルによる配信先の自動判定
-- 5言語翻訳の生成と確認
-- 静的成果物の一括生成
-- dry-runと差分表示
-- `npm run check` 実行
-- 1コミットでの公開と競合再試行
-- Pages公開状況と本番URL確認
-- 記事更新、公開終了、版移転
-- 操作履歴、コミットSHA、エラー、再試行状態
-- git revertによるロールバック支援
+## 22. Definition of Done
 
-アプリの内部データは、少なくとも `operationId`、記事ID、Issue、対象版、開始時main SHA、生成器バージョン、状態、commit SHA、deployment結果、時刻、エラー概要を保持します。認証情報はこの履歴へ含めません。
+この仕様変更全体は次をすべて満たした時だけ完了です。
 
-## 25. Definition of Done
-
-記事の自動更新は、次をすべて満たしたときだけ完了です。
-
-- Markdownが `docs/article-format.md` に適合している。
-- IDとIssueが両版で一意である。
-- `site.config.json` に従い、1つの版だけへ配置されている。
-- 正本と全生成物が1コミットで同期している。
-- `npm run check` と追加検証が成功している。
-- `main` をforce pushしていない。
-- Cloudflare Pagesがそのcommit SHAを正常公開している。
-- 本番URL、canonical、RSS、sitemap、保存UI、翻訳が確認できる。
-- 操作履歴に記事ID、版、commit SHA、公開結果が残っている。
-- 共通契約を変えた場合、3リポジトリのこの文書と関連スキーマが同期している。
+- `kizi`の`main`から統合UIとPages Functionsがデプロイされている。
+- R2 bucketと`ARTICLES` bindingが本番で有効である。
+- 2記事リポジトリにschemaVersion 2、同期script、workflow、kizi canonicalが入っている。
+- 既存記事`2026.8.19.1`が工学カタログにあり、kizi URLで200を返す。
+- 旧記事URLがkiziへ転送される。
+- `/api/catalog`、RSS、sitemapが2版の和集合を返す。
+- `npm run check`が3リポジトリで成功する。
+- Publisher次版がAction、status、public URLを確認する仕様を実装または追跡できる。
+- 認証情報がGit、生成HTML、ログ、journalへ入っていない。
+- 共通文書が3リポジトリで一致している。

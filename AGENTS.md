@@ -16,26 +16,29 @@
 
 ## Edition routing
 
-- `kizi-kougaku` は、`categories` に `engineering` を含む記事だけを配信する。
-- `kizi-other` は、`categories` に `engineering` を含まない記事だけを配信する。
+- `kizi-kougaku` は、`categories` に `engineering` を含む記事だけの正本を保持する。
+- `kizi-other` は、`categories` に `engineering` を含まない記事だけの正本を保持する。
 - 1記事を両方の版で配信しない。振り分け判定では主ジャンル・副ジャンルを区別せず、`categories` 全体を見る。
-- `kizi` は記事を配信せず、`kizi-kougaku`、`kizi-other`、Studio Riziへの案内ページだけを置く。
+- `kizi` は2記事リポジトリからR2へ同期された記事を統合配信し、読者向けURLを `https://kizi.pages.dev/articles/<ID>` に統一する。
 - 雄武町の金銀鉱床の記事 `2026.8.19.1` は `engineering` を含め、`kizi-kougaku` だけで配信する。
 
 ## Publishing contract
 
-- サイト固有のURLと振り分け条件は `site.config.json` を正とする。
+- サイト固有のURL、振り分け条件、配信先は `site.config.json` を正とする。
 - 記事追加時はMarkdown、`website/articles/index.json`、生成HTML、トップページ、RSS、サイトマップを同じ更新単位で同期する。
 - 公開前に `npm run check` を通す。
-- GitHubの `main` へのpushをCloudflare Pagesの本番自動デプロイ起点とする。
+- 記事リポジトリの`main`へのpushをGitHub ActionsのR2同期起点とし、`kizi`リポジトリの`main`へのpushを統合UIとPages Functionsの本番デプロイ起点とする。
 - 自動更新アプリは2つの記事リポジトリの最新 `main` を確認してから、記事IDとIssue番号を横断採番する。
-- 公開成果物は1回のGitコミットで原子的に更新する。複数ファイルを1ファイルずつ `main` へ直接書き込まない。
+- 公開成果物は1回のGitコミットで原子的に更新する。R2では記事オブジェクトを先に保存し、版カタログを最後に切り替える。複数ファイルを1ファイルずつ `main` へ直接書き込まない。
+- GitHub Actionsの同期はGitHub OIDCを使い、Cloudflare API tokenやR2 access keyを記事リポジトリへ保存しない。
+- Publisherはpush後に`Publish to kizi` Check Run、`/api/publish-status`、統合記事URLの順に確認し、3つすべてが成功するまで公開完了にしない。
 - 認証情報、APIトークン、AIの内部プロンプト、未公開の取材情報をリポジトリやブラウザへ保存しない。
 
 ## kizi Publisher continuity contract
 
 - macOS投稿アプリのソース正本はprivate repository `https://github.com/oriyu90/kizi-publisher-macos` の `main` とする。ローカルの作業フォルダは使い捨てであり、引き継ぎ時は `gh repo clone oriyu90/kizi-publisher-macos` で復元する。
 - 現行配布版は `v0.1.1`、対象commitは `2339eb504e3372f25b28f2201903163edd3746e9`、Releaseは `https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.1.1` とする。変更を始める前に同repositoryの `README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md` と最新Releaseを確認する。
+- `v0.1.1` はR2統合配信へ未対応である。次版では記事リポジトリへのpush後にGitHub Check Run `Publish to kizi / delivery`、`kizi.pages.dev/api/publish-status`、統合記事URLを順に確認する。Cloudflare資格情報をPublisherへ追加しない。詳細は `docs/system-design-and-operations.md` v2に従う。
 - v0.1.1の通常入力はAIが作成したMarkdown、主ジャンル、任意の副ジャンルだけである。ID、Issue、公開日、order、author、language、readingMinutes、heroPool、status、配信先、公開URL、commit messageはアプリが決める。
 - v0.1.1が実装済みの公開操作は新規追加と完全削除である。既存記事編集、公開終了、版移転、revert専用UIは未実装なので、存在を仮定しない。
 - 起動時と公開操作前に3リポジトリを同期し、2記事版の最新 `main` を横断してIDとIssueを採番する。記事操作はアプリ専用cloneとdetached worktreeで行い、検証後の全成果物を1commitで `main` へpushする。force pushとユーザーの通常cloneの変更は禁止する。

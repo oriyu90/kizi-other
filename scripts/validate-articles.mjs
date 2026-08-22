@@ -83,7 +83,7 @@ for (const article of manifest.articles) {
   try {
     const html = await readFile(articlePath, "utf8");
     if (!html.includes(`data-article-slug="${article.id}"`)) errors.push(`${article.id}: HTML内の記事IDが一致しません`);
-    if (!html.includes(`${site.origin}/articles/${article.id}`)) errors.push(`${article.id}: canonical URLが一致しません`);
+    if (!html.includes(`${site.deliveryOrigin}/articles/${article.id}`)) errors.push(`${article.id}: canonical URLが統合配信先と一致しません`);
     if (!html.includes("data-favorite-toggle")) errors.push(`${article.id}: お気に入りボタンがありません`);
     if (!html.includes("data-read-later-toggle")) errors.push(`${article.id}: あとで読むボタンがありません`);
     for (const language of requiredTranslations) {

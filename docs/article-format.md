@@ -131,14 +131,16 @@ status: draft
 2. `categories` によって配信先を1つに決める。
 3. `website/articles/<ID>.html` を生成する。
 4. `website/articles/index.json` を更新する。
-5. トップページ、ジャンル件数、RSS、サイトマップ、canonical、OGP、JSON-LDを更新する。
+5. 記事版のトップページ、RSS、サイトマップと、記事HTML内のcanonical、OGP、JSON-LDを更新する。
 6. リンク、翻訳、トップ画像プール、1記事1ファイルを検証する。
-7. `main` へ反映し、Cloudflare PagesのGit連携で自動公開する。
+7. 対象記事リポジトリの`main`へ1コミットで反映する。
+8. GitHub Actionsが変更された記事HTMLと版カタログをR2へ同期し、`kizi.pages.dev`の公開URLを有効化する。
 
 配信先は次の通りです。
 
-- `categories` に `engineering` を含む: `kizi-kougaku.pages.dev`
-- `categories` に `engineering` を含まない: `kizi-other.pages.dev`
+- `categories` に `engineering` を含む: 正本は`oriyu90/kizi-kougaku`
+- `categories` に `engineering` を含まない: 正本は`oriyu90/kizi-other`
+- どちらも読者向け公開URLは`https://kizi.pages.dev/articles/<ID>`
 
 ## 8. 公開前チェック
 

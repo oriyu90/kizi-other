@@ -1,39 +1,30 @@
-# kizi
+# kizi article source
 
-背景まで丁寧に読み解く独立系ニュースサイトの共通コードです。公開版は役割で分かれています。
+このリポジトリはkiziの記事正本と生成済み成果物を保持するsource repositoryです。読者向けサイトと記事URLは[kizi](https://kizi.pages.dev/)へ統一されています。
 
-- [kizi 工学](https://kizi-kougaku.pages.dev/): `engineering` を含む記事
-- [kizi 非工学](https://kizi-other.pages.dev/): `engineering` を含まない記事
-- [kizi 案内](https://kizi.pages.dev/): 2版とStudio Riziへの入口
+- 工学を含む記事の正本: `oriyu90/kizi-kougaku`
+- 工学を含まない記事の正本: `oriyu90/kizi-other`
+- 読者向け記事URL: `https://kizi.pages.dev/articles/<ID>`
 - Author: [Yuki Orita / Studio Rizi](https://studio-rizi.pages.dev/)
 
 ## AI article workflow
 
-記事IDは公開日とその日の連番を組み合わせた `YYYY.M.D.N` です。例: `2026.8.21.1`。
+記事IDは公開日とその日の連番を組み合わせた`YYYY.M.D.N`です。
 
-- AI原稿は `content/articles/<記事ID>.md` に1記事1ファイルで保存する
-- Markdownを唯一の編集元にし、投稿アプリが `website/articles/<記事ID>.html` を生成する
-- タイトル、副題、要点、説明、ジャンル、出典を含む
+- `content/articles/<記事ID>.md`へ1記事1ファイルで保存する
+- Markdownを唯一の編集元にし、Publisherが`website/articles/<記事ID>.html`を生成する
 - 本文画像は使わず、ジャンル別の共通トップ画像を使う
-- 工学を含むかどうかで2つの公開版へ自動振り分けする
+- 工学を含むかどうかで2つのsource repositoryへ自動振り分けする
 
-AIへ渡す完全な仕様は [docs/article-format.md](docs/article-format.md)、リポジトリ共通ルールは [AGENTS.md](AGENTS.md)、自動更新アプリ向けの設計・リポジトリ・保守契約は [docs/system-design-and-operations.md](docs/system-design-and-operations.md) を参照してください。
+完全な原稿仕様は[docs/article-format.md](docs/article-format.md)、共通ルールは[AGENTS.md](AGENTS.md)、R2同期とPublisherの保守契約は[docs/system-design-and-operations.md](docs/system-design-and-operations.md)を参照してください。
 
 ## Publishing workflow
 
 ```sh
-npm run article:next-id -- 2026-08-21
 npm run check
 git push origin main
 ```
 
-`main` へのpush後、Cloudflare PagesのGit連携が `website/` を自動公開します。サイトURLと版の振り分け条件は `site.config.json` で管理します。
+`main`へのpush後、GitHub Actionsの`Publish to kizi`がOIDCで統合配信APIへ接続します。変更された記事HTMLだけをCloudflare R2へ保存し、版カタログを最後に確定します。CloudflareのAPI tokenやR2 keyをこのリポジトリへ保存しません。
 
-## Local preview
-
-```sh
-cd website
-python3 -m http.server 4173
-```
-
-トップ画像は `website/assets/images/` に5ジャンル×4枚を収録し、`website/assets/app.js` が記事ジャンルのプールから選びます。
+`kizi-kougaku.pages.dev`と`kizi-other.pages.dev`は互換転送用です。canonical、OGP、JSON-LD、共有URLには`site.config.json`の`deliveryOrigin`を使います。

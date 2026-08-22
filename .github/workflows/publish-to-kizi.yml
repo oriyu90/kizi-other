@@ -1,0 +1,30 @@
+name: Publish to kizi
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: kizi-delivery-other
+  cancel-in-progress: false
+
+jobs:
+  delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate source and generated files
+        run: npm run check
+      - name: Sync changed artifacts and commit catalog
+        env:
+          KIZI_EDITION: other
+        run: node scripts/sync-delivery.mjs
