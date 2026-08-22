@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kizi-other.pages.dev/sitemap.xml
+

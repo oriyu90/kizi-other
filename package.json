@@ -1,0 +1,10 @@
+{
+  "name": "kizi-other",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "article:next-id": "node scripts/next-article-id.mjs",
+    "validate:articles": "node scripts/validate-articles.mjs",
+    "check": "node --check website/assets/app.js && node --check website/assets/reader.js && npm run validate:articles"
+  }
+}

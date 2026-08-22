@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    { "id": "culture", "name": "文化" },
+    { "id": "economy", "name": "経済" },
+    { "id": "engineering", "name": "工学" },
+    { "id": "politics", "name": "政治" },
+    { "id": "science", "name": "理学" }
+  ],
+  "imagePools": {
+    "culture": ["culture-2026-01.webp", "culture-2026-02.webp", "culture-2026-03.webp", "culture-2026-04.webp"],
+    "economy": ["economy-2026-01.webp", "economy-2026-02.webp", "economy-2026-03.webp", "economy-2026-04.webp"],
+    "engineering": ["engineering-2026-01.webp", "engineering-2026-02.webp", "engineering-2026-03.webp", "engineering-2026-04.webp"],
+    "politics": ["politics-2026-01.webp", "politics-2026-02.webp", "politics-2026-03.webp", "politics-2026-04.webp"],
+    "science": ["science-2026-01.webp", "science-2026-02.webp", "science-2026-03.webp", "science-2026-04.webp"]
+  },
+  "articles": []
+}

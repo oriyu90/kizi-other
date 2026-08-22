@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>kizi 非工学</title>
+    <link>https://kizi-other.pages.dev/</link>
+    <description>文化・経済・政治・理学のニュースを背景から読み解く。</description>
+    <language>ja</language>
+    <lastBuildDate>Sat, 22 Aug 2026 00:00:00 +0900</lastBuildDate>
+    <atom:link href="https://kizi-other.pages.dev/feed.xml" rel="self" type="application/rss+xml" />
+  </channel>
+</rss>

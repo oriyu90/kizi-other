@@ -1,0 +1,23 @@
+{
+  "id": "/",
+  "name": "kizi 非工学",
+  "short_name": "kizi 非工学",
+  "description": "文化・経済・政治・理学のニュースを背景から読み解く",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f0e9",
+  "theme_color": "#11120f",
+  "lang": "ja",
+  "categories": ["news", "education"],
+  "icons": [
+    {"src": "/assets/icons/kizi-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/icons/kizi-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/icons/kizi-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    {"src": "/assets/icons/kizi-app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ],
+  "shortcuts": [
+    {"name": "お気に入り", "short_name": "お気に入り", "url": "/favorites"},
+    {"name": "あとで読む", "short_name": "あとで読む", "url": "/read-later"}
+  ]
+}

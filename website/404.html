@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex"><title>ページが見つかりません | kizi</title>
+  <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/styles.css?v=11">
+  <script>
+    (() => {
+      const mode = localStorage.getItem('kizi-theme-mode') || 'system';
+      document.documentElement.dataset.theme = mode === 'system'
+        ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : mode;
+    })();
+  </script>
+</head>
+<body>
+  <main class="page-shell" style="min-height:100vh;display:grid;place-items:center;text-align:center">
+    <div><p class="eyebrow" style="justify-content:center">404 / Not found</p><h1 class="section-title">このページは、<br>まだ記事になっていません。</h1><p><a class="hero-link" href="/">トップへ戻る <span aria-hidden="true">→</span></a></p></div>
+  </main>
+</body>
+</html>
