@@ -1,5 +1,11 @@
 # kizi common rules
 
+## Read first
+
+- 記事・投稿アプリ・公開処理を変更する前に `docs/article-format.md` と `docs/system-design-and-operations.md` を読む。
+- `AGENTS.md` は不変の共通ルール、`docs/article-format.md` はAI原稿契約、`docs/system-design-and-operations.md` はシステム設計・リポジトリ・保守契約とする。
+- 実装と文書が食い違う場合は推測で公開せず、実装、検証スクリプト、スキーマ、文書を同じ変更で整合させる。
+
 ## Article source of truth
 
 - AIが作成する記事は `content/articles/<YYYY.M.D.N>.md` に、1記事1Markdownファイルで保存する。
@@ -22,3 +28,6 @@
 - 記事追加時はMarkdown、`website/articles/index.json`、生成HTML、トップページ、RSS、サイトマップを同じ更新単位で同期する。
 - 公開前に `npm run check` を通す。
 - GitHubの `main` へのpushをCloudflare Pagesの本番自動デプロイ起点とする。
+- 自動更新アプリは2つの記事リポジトリの最新 `main` を確認してから、記事IDとIssue番号を横断採番する。
+- 公開成果物は1回のGitコミットで原子的に更新する。複数ファイルを1ファイルずつ `main` へ直接書き込まない。
+- 認証情報、APIトークン、AIの内部プロンプト、未公開の取材情報をリポジトリやブラウザへ保存しない。

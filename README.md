@@ -17,7 +17,7 @@
 - 本文画像は使わず、ジャンル別の共通トップ画像を使う
 - 工学を含むかどうかで2つの公開版へ自動振り分けする
 
-AIへ渡す完全な仕様は [docs/article-format.md](docs/article-format.md)、リポジトリ共通ルールは [AGENTS.md](AGENTS.md) を参照してください。
+AIへ渡す完全な仕様は [docs/article-format.md](docs/article-format.md)、リポジトリ共通ルールは [AGENTS.md](AGENTS.md)、自動更新アプリ向けの設計・リポジトリ・保守契約は [docs/system-design-and-operations.md](docs/system-design-and-operations.md) を参照してください。
 
 ## Publishing workflow
 
