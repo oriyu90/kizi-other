@@ -213,14 +213,19 @@ Actionは同期前に`git ls-remote origin refs/heads/main`を実行し、`GITHU
 | `GET /api/catalog` | 2版を重複確認して日付・order降順に統合 | 60秒 |
 | `GET /api/publish-status?edition=&commit=` | Publisherの公開完了確認 | `no-store` |
 | `GET /api/health` | R2 bindingと各カタログのcommit確認 | `no-store` |
+| `GET /api/r2-usage` | 当月のR2無料枠使用量と課金目安 | 300秒 |
 | `GET /feed.xml` | 統合RSS | 300秒 |
 | `GET /sitemap.xml` | 統合sitemap | 300秒 |
 
 存在しない記事は404、カタログにはあるがR2本文が欠ける異常は503で返します。`.html`付き旧URLは拡張子なしURLへ301転送します。記事応答にはcontent type、ETag、nosniff、CSPを付けます。
 
-## 10. Publisher次版の実装契約
+`/api/r2-usage`はCloudflare Analytics GraphQLの`r2OperationsAdaptiveGroups`と`r2StorageAdaptiveGroups`を使い、UTC月初から現在までのaccount全bucketを集計します。無料枠がaccount全体に適用されるため、`kizi-articles`だけに絞って残量を過大表示しません。R2 Standardの無料枠はストレージ10 GB-month、Class A 100万件、Class B 1,000万件として表示します。ストレージはbucketごとの日別peak byteを30日で按分し、操作はCloudflareのaction typeをClass A/B/無料操作へ分類します。未知の操作種別があれば料金推定を出しません。
 
-現行配布版v0.1.1のGit操作、safeStorage、journal、detached worktree、競合検出は維持します。次版では投稿入力やMarkdown契約を変えず、公開後の工程だけを次へ変更します。
+この値はStandard storageの推定であり、Analyticsの集計遅延、Infrequent Accessのretrieval・最低保存期間、Data Catalog等の追加料金、請求単位の丸めを完全には再現しません。請求書の確定値ではなく、正確な課金判断はCloudflare dashboardを正とします。APIが利用する`CLOUDFLARE_ACCOUNT_ID`とread-onlyの`CLOUDFLARE_ANALYTICS_TOKEN`はkizi Pages Secretだけに置き、Publisher、GitHub、browserへ渡しません。未設定時は503と公式無料枠を返し、Publisherは「実測値なし」と表示します。
+
+## 10. Publisher v0.2.0の実装契約
+
+v0.1.1のGit操作、safeStorage、journal、detached worktree、競合検出を維持し、v0.2.0では投稿入力やMarkdown契約を変えず、公開後の工程を次へ変更しました。
 
 1. 起動時と公開前に`kizi`、`kizi-kougaku`、`kizi-other`の`site.config.json`を読み、schemaVersion 2とリポジトリ組を確認する。
 2. 2記事版の最新`main`を横断してIDとIssueを採番する。
@@ -230,6 +235,7 @@ Actionは同期前に`git ls-remote origin refs/heads/main`を実行し、`GITHU
 6. `GET https://kizi.pages.dev/api/publish-status?edition=<edition>&commit=<sha>`が200かつ同じcommitを返すことを確認する。
 7. `GET https://kizi.pages.dev/articles/<ID>`が200、canonicalがkizi、記事IDが一致することを確認する。
 8. ここまで成功した時だけjournalを`published`にする。
+9. 起動同期と「配信・R2」画面で`/api/health`と`/api/r2-usage`を取得し、配信commitと無料枠の残量を表示する。
 
 Publisher自身はR2へアップロードせず、Cloudflare資格情報を保存しません。GitHub Actionが遅延・失敗した場合は`push済み・配信同期待ち`として記録し、同じcommitのCheck Runとstatusを再確認します。新しい記事commitを重ねて回避しません。
 
@@ -249,7 +255,7 @@ Publisher履歴へ次を追加します。
 }
 ```
 
-完全削除では対象記事リポジトリから正本と生成物を1commitで削除し、Action成功後にkizi URLが404、カタログ・RSS・sitemapから消えたことを確認します。既存記事編集、公開終了、版移転、revert専用UIはv0.1.1では未実装であり、実装前提にしません。
+完全削除では対象記事リポジトリから正本と生成物を1commitで削除し、Action成功後にkizi URLが404、カタログ・RSS・sitemapから消えたことを確認します。既存記事編集、公開終了、版移転、revert専用UIはv0.2.0では未実装であり、実装前提にしません。
 
 ## 11. 公開状態と完了条件
 
