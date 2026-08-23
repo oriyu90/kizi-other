@@ -223,18 +223,18 @@ Actionは同期前に`git ls-remote origin refs/heads/main`を実行し、`GITHU
 
 この値はStandard storageの推定であり、Analyticsの集計遅延、Infrequent Accessのretrieval・最低保存期間、Data Catalog等の追加料金、請求単位の丸めを完全には再現しません。請求書の確定値ではなく、正確な課金判断はCloudflare dashboardを正とします。APIが利用する`CLOUDFLARE_ACCOUNT_ID`とread-onlyの`CLOUDFLARE_ANALYTICS_TOKEN`はkizi Pages Secretだけに置き、Publisher、GitHub、browserへ渡しません。未設定時は503と公式無料枠を返し、Publisherは「実測値なし」と表示します。
 
-## 10. Publisher v0.2.0の実装契約
+## 10. Publisher v0.2.1の実装契約
 
-v0.1.1のGit操作、safeStorage、journal、detached worktree、競合検出を維持し、v0.2.0では投稿入力やMarkdown契約を変えず、公開後の工程を次へ変更しました。
+v0.2.0のR2統合配信、safeStorage、journal、detached worktreeを維持し、v0.2.1では投稿入力を変えず、横断競合、削除確認、クラッシュ復旧を強化しました。
 
 1. 起動時と公開前に`kizi`、`kizi-kougaku`、`kizi-other`の`site.config.json`を読み、schemaVersion 2とリポジトリ組を確認する。
-2. 2記事版の最新`main`を横断してIDとIssueを採番する。
+2. 2記事版の最新`main`を横断してIDとIssueを採番し、preview時とcommit直前にdirectoryを含む3リポジトリのremote SHA snapshotが一致することを確認する。
 3. 記事HTMLのcanonical、OGP、JSON-LD、保存URLを`deliveryOrigin`で生成する。
-4. 対象記事リポジトリで`npm run check`を通し、1commitで`main`へpushする。
+4. 対象記事リポジトリで`npm run check`を通し、commit作成直後とpush直後にjournalへSHAを保存してから、1commitで`main`へpushする。
 5. GitHub Check Run `Publish to kizi / delivery`が対象commitで成功するまで待つ。
 6. `GET https://kizi.pages.dev/api/publish-status?edition=<edition>&commit=<sha>`が200かつ同じcommitを返すことを確認する。
 7. `GET https://kizi.pages.dev/articles/<ID>`が200、canonicalがkizi、記事IDが一致することを確認する。
-8. ここまで成功した時だけjournalを`published`にする。
+8. ここまで成功した時だけ、新規追加はjournalを`published`、完全削除は`completed`にする。
 9. 起動同期と「配信・R2」画面で`/api/health`と`/api/r2-usage`を取得し、配信commitと無料枠の残量を表示する。
 
 Publisher自身はR2へアップロードせず、Cloudflare資格情報を保存しません。GitHub Actionが遅延・失敗した場合は`push済み・配信同期待ち`として記録し、同じcommitのCheck Runとstatusを再確認します。新しい記事commitを重ねて回避しません。
@@ -255,7 +255,9 @@ Publisher履歴へ次を追加します。
 }
 ```
 
-完全削除では対象記事リポジトリから正本と生成物を1commitで削除し、Action成功後にkizi URLが404、カタログ・RSS・sitemapから消えたことを確認します。既存記事編集、公開終了、版移転、revert専用UIはv0.2.0では未実装であり、実装前提にしません。
+完全削除では対象記事リポジトリから正本と生成物を1commitで削除し、Action成功後にkizi URLが404であることを確認します。collectionは記事IDの部分一致では判定せず、catalogの`id`/`url`、RSSの`link`/`guid`、sitemapの`loc`から完全一致参照が消えたことを検証します。既存記事編集、公開終了、版移転、revert専用UIはv0.2.1では未実装であり、実装前提にしません。
+
+commit作成後にpushできなかった場合はjournalのcommit SHAと`refs/kizi-publisher/recovery/<sha12>`を残します。再確認時に対象SHAがremote `main`と一致しなければR2確認へ進まず、recovery refを案内します。journalはfield、ISO日時、SHA、HTTPS URLを検証し、3 MiB/件・24 MiB/一覧を上限として壊れたrecordを隔離します。
 
 ## 11. 公開状態と完了条件
 
@@ -404,7 +406,7 @@ GCは通常のPublisher公開処理へ混ぜません。catalogとstatusを削�
 
 ## 21. Publisher引き継ぎ
 
-Publisherの正本はprivate repository `oriyu90/kizi-publisher-macos`の`main`です。変更前に同repoの`README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md`、最新Releaseを確認します。
+Publisherの正本はprivate repository `oriyu90/kizi-publisher-macos`の`main`です。現行版はv0.2.1、commit `9f85b895c06582962e24180b202ab731ceb2ed2e`、Releaseは`https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.2.1`です。変更前に同repoの`README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md`、最新Releaseを確認します。
 
 v0.1.1の既存要件である、専用clone、detached worktree、file lock、atomic journal、remote SHA確認、Git recovery ref、safeStorage、secret非出力、force push禁止を維持します。v2対応では本章10のdelivery状態と確認URLを追加し、既存journalを読み込める後方互換migrationを実装します。
 
