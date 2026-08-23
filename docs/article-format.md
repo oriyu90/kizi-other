@@ -9,6 +9,7 @@
 - 例: 2026年8月21日の1本目は `content/articles/2026.8.21.1.md`。
 - ファイル名、front matterの `id`、公開HTML名、カタログIDを完全に一致させる。
 - Markdownを唯一の編集元とし、生成済みHTMLを手で直さない。
+- kizi Publisherへ貼る段階ではファイル名と記事IDをAIに決めさせない。Publisherが横断採番し、保存時に完全なfront matterを生成する。
 
 ## 2. AIへの出力指示
 
@@ -16,26 +17,12 @@ AIは説明、前置き、コードフェンスを付けず、次の形式のMar
 
 ```markdown
 ---
-schemaVersion: 2
-id: "2026.8.21.1"
-issue: 2
 title: "記事タイトル"
 subtitle: "記事の視点を示す短い副題"
-description: "トップページと検索結果に使う、全角70〜120字程度の要約。"
-publishedAt: "2026-08-21"
-updatedAt: "2026-08-21"
-order: 1
-author: "kizi編集部"
-language: "ja"
-categories:
-  - engineering
-  - science
+description: "記事の対象と主要な事実、読者が得られる理解を本文と矛盾しない形で簡潔にまとめた、トップページ、検索結果、SEO、SNS表示にも使える全角70〜120字程度の日本語要約です。"
 tags:
-  - 資源開発
-  - 地質
-readingMinutes: 10
-heroPool: engineering
-status: draft
+  - "資源開発"
+  - "地質"
 ---
 
 ## 要点
@@ -61,7 +48,9 @@ status: draft
 - [資料名](https://example.com/source) — 発行元、公開日または参照日
 ```
 
-## 3. 必須メタデータ
+Publisher入力用front matterへAIが書くのは`title`、`subtitle`、`description`、`tags`だけです。ジャンルはPublisher画面で選択します。`schemaVersion`、`id`、`issue`、公開日、`order`、`author`、`language`、`categories`、`readingMinutes`、`heroPool`、`status`はPublisherが決定し、次節の完全な保存形式へ正規化します。執筆AIへ渡す独立した完全指示は、private Publisher repositoryの`docs/AI_ARTICLE_WRITING_RULES.txt`を正とします。
+
+## 3. Publisherが保存する正本の必須メタデータ
 
 | 項目 | 型・条件 | 用途 |
 | --- | --- | --- |
@@ -128,7 +117,7 @@ status: draft
 投稿アプリはMarkdownを読み、公開時に次を同じ処理で更新します。
 
 1. front matterと本文構造を検証する。
-2. `categories` によって配信先を1つに決める。
+2. Publisher画面で選択された `categories` によって配信先を1つに決める。
 3. `website/articles/<ID>.html` を生成する。
 4. `website/articles/index.json` を更新する。
 5. 記事版のトップページ、RSS、サイトマップと、記事HTML内のcanonical、OGP、JSON-LDを更新する。
