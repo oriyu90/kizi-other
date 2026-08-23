@@ -37,18 +37,19 @@
 ## kizi Publisher continuity contract
 
 - macOS投稿アプリのソース正本はprivate repository `https://github.com/oriyu90/kizi-publisher-macos` の `main` とする。ローカルの作業フォルダは使い捨てであり、引き継ぎ時は `gh repo clone oriyu90/kizi-publisher-macos` で復元する。
-- 現行配布版は `v0.2.1`、対象commitは `9f85b895c06582962e24180b202ab731ceb2ed2e`、Releaseは `https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.2.1` とする。変更を始める前に同repositoryの `README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md` と最新Releaseを確認する。
-- `v0.2.1` はR2統合配信へ対応済みである。記事リポジトリへのpush後にGitHub Check Run `Publish to kizi / delivery`、`kizi.pages.dev/api/publish-status`、統合記事URLを順に確認し、push後の確認失敗は同じcommitを操作履歴から再確認する。Cloudflare資格情報をPublisherへ追加しない。
-- v0.2.1の通常入力はAIが作成したMarkdown、主ジャンル、任意の副ジャンルだけである。ID、Issue、公開日、order、author、language、readingMinutes、heroPool、status、配信先、公開URL、commit messageはアプリが決める。AI原稿のauthorとreadingMinutesは採用しない。
-- v0.2.1が実装済みの公開操作は新規追加と完全削除である。既存記事編集、公開終了、版移転、revert専用UIは未実装なので、存在を仮定しない。
-- v0.2.1はpreview時とcommit直前に3リポジトリのremote SHA snapshotを照合する。commit作成直後とpush直後にjournalへSHAを保存し、local-only commitはR2確認へ進めずrecovery refを案内する。完全削除後のcollection確認は記事IDの部分一致ではなく、catalogのid/url、RSSのlink/guid、sitemapのlocを完全一致で判定する。
+- 現行配布版は `v0.3.0`、対象commitは `274798c4731f8a73a545b850d711b45f1e827a2d`、Releaseは `https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.3.0` とする。変更を始める前に同repositoryの `README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md` と最新Releaseを確認する。
+- `v0.3.0` はR2統合配信へ対応済みである。記事リポジトリへのpush後にGitHub Check Run `Publish to kizi / delivery`、`kizi.pages.dev/api/publish-status`、統合記事URLを順に確認し、push後の確認失敗は同じcommitを操作履歴から再確認する。Cloudflare資格情報をPublisherへ追加しない。
+- v0.3.0の通常入力はAIが作成したMarkdown、主ジャンル、任意の副ジャンルだけである。ID、Issue、公開日、order、author、language、readingMinutes、heroPool、status、配信先、公開URL、commit messageはアプリが決める。AI原稿のauthorとreadingMinutesは採用しない。
+- v0.3.0が実装済みの公開操作は新規追加と完全削除である。既存記事編集、公開終了、版移転、revert専用UIは未実装なので、存在を仮定しない。
+- v0.3.0はpreview時とcommit直前に3リポジトリのremote SHA snapshotを照合する。commit作成直後とpush直後にjournalへSHAを保存し、local-only commitはR2確認へ進めずrecovery refを案内する。完全削除後のcollection確認は記事IDの部分一致ではなく、catalogのid/url、RSSのlink/guid、sitemapのlocを完全一致で判定する。
 - 起動時と公開操作前に3リポジトリを同期し、2記事版の最新 `main` を横断してIDとIssueを採番する。記事操作はアプリ専用cloneとdetached worktreeで行い、検証後の全成果物を1commitで `main` へpushする。force pushとユーザーの通常cloneの変更は禁止する。
 - GitHub認証は端末の `gh` ログインを利用し、GitHub tokenをアプリへ保存しない。AI keyはElectron `safeStorage` で暗号化し、renderer、Git、operation journal、ログへ渡さない。
 - 翻訳はOpenAI API互換providerに対応する。Chat Completionsの `<base>/chat/completions` とResponsesの `<base>/responses` を選択できる。外部Base URLはHTTPSのみ、loopbackだけHTTPを許可する。key不要設定ではAuthorization headerを送信しない。
 - 公開前にrouting、生成物、変更ファイルallowlist、secret、対象リポジトリの `npm run check`、remote SHAを検証する。push後はCloudflare PagesのCheck Runと本番HTTPを確認し、push済みだが確認に失敗した状態を未公開と誤表示しない。
-- アプリの操作journal、専用clone、設定は `~/Library/Application Support/kizi Publisher/` に置く。公開操作はfile lock、atomic journal、push失敗時のGit recovery refを使い、クラッシュ後もremote SHAとjournalから結果を判定できる状態を維持する。
-- GUIはHallmarkのinteraction-state原則を採用済みである。primary buttonはオレンジ面に暗色文字を使い、default、hover、focus、active、disabled、loading、error、successを区別する。visible buttonは44×44 CSS px以上、focus ringを常時識別可能にし、light/dark両テーマの文字コントラストを自動試験する。v0.2.1の測定範囲は4.72:1〜16.95:1である。
-- v0.2.1の「配信・R2」画面はaccount全体のR2 Standard無料枠に対する月初来推定を表示する。実測にはkizi Pages productionの`CLOUDFLARE_ACCOUNT_ID`とAccount Analytics Read tokenを`CLOUDFLARE_ANALYTICS_TOKEN`として設定する。未設定時は公式無料枠と「実測値なし」を表示し、請求確定値はCloudflare dashboardを正とする。
-- v0.2.1はmacOS 12.0以降、arm64/x64向けDMGを配布する。arm64 SHA-256は `94a589956e908560c99115b43e8d6a18e6594e46fa4ec0edb909715afde262cf`、x64は `5c683d443ba446baf15aad832f0d4a197cc21695b8be363b21e76fea19be06c4` である。
-- v0.2.1 DMGはad-hoc署名、mount、`codesign --verify --deep --strict`、起動を確認済みだが、Developer ID署名とApple notarizationは未実施である。実機起動確認はmacOS 26.5のApple Silicon、x64はRosetta経由であり、macOS 12〜25とIntel実機は未確認である。
+- アプリの操作journal、専用clone、設定、Memoは `~/Library/Application Support/kizi Publisher/` に置く。公開操作はfile lock、atomic journal、push失敗時のGit recovery refを使い、クラッシュ後もremote SHAとjournalから結果を判定できる状態を維持する。
+- v0.3.0のMemoは「操作履歴」と「設定」の間にあり、AI執筆ルールをUTF-8 plain textで `memo.txt` へ保存する。700ms後・focus解除時・通常終了前に自動保存し、明示保存とCommand+Sにも対応する。上限は1 MiB、file modeは0600、atomic renameを使い、symlinkを拒否する。アプリ更新・アプリ再起動・Mac再起動後も同じuserDataから復元し、GitHub、記事リポジトリ、AI APIへ送信しない。暗号化しないためcredentialや未公開取材情報は保存しない。
+- GUIはHallmarkのinteraction-state原則を採用済みである。primary buttonはオレンジ面に暗色文字を使い、default、hover、focus、active、disabled、loading、error、successを区別する。visible buttonは44×44 CSS px以上、focus ringを常時識別可能にし、light/dark両テーマの文字コントラストを自動試験する。v0.3.0の測定範囲は4.72:1〜16.95:1である。
+- v0.3.0の「配信・R2」画面はaccount全体のR2 Standard無料枠に対する月初来推定を表示する。実測にはkizi Pages productionの`CLOUDFLARE_ACCOUNT_ID`とAccount Analytics Read tokenを`CLOUDFLARE_ANALYTICS_TOKEN`として設定する。未設定時は公式無料枠と「実測値なし」を表示し、請求確定値はCloudflare dashboardを正とする。
+- v0.3.0はmacOS 12.0以降、arm64/x64向けDMGを配布する。arm64 SHA-256は `19c548ccacf8a8fa6d4e60cc8aa6982c2c83fe717c87b96bc7947ea63eb8e038`、x64は `d2908eddc28f6c411362a0794a17caa54036f715b7ad1f7ae952a0847e8a1343` である。
+- v0.3.0 DMGはad-hoc署名、mount、`codesign --verify --deep --strict`、起動を確認済みだが、Developer ID署名とApple notarizationは未実施である。実機起動確認はmacOS 26.5のApple Silicon、x64はRosetta経由であり、macOS 12〜25とIntel実機は未確認である。
 - Publisherの契約やRelease情報を変更した場合、この節を `kizi`、`kizi-kougaku`、`kizi-other` の3リポジトリで同じcommit単位に同期する。
