@@ -242,6 +242,8 @@ Publisher自身はR2へアップロードせず、Cloudflare資格情報を保�
 
 Memoの保存先は`~/Library/Application Support/kizi Publisher/memo.txt`、形式はUTF-8 plain text、上限は1 MiBです。700ms後、focus解除時、通常終了前に自動保存し、明示保存とCommand+Sにも対応します。mode `0600`の一時ファイルからatomic renameし、読み込み時はsymlinkと通常ファイル以外を拒否します。同じElectron `userData`を使うためアプリ更新・アプリ再起動・Mac再起動後も復元します。GitHub、記事リポジトリ、AI APIへは送信せず、暗号化もしないためcredentialや未公開取材情報は保存対象外です。強制終了・電源断の直前700ms以内の未保存入力は保証せず、直前の保存済みファイルを維持します。
 
+執筆AIへ渡すPublisher入力専用契約は、private Publisher repositoryの`docs/AI_ARTICLE_WRITING_RULES.txt`を正とします。AI入力front matterは`title`、`subtitle`、`description`、`tags`だけです。記事リポジトリへ保存される完全なfront matterの残りはPublisherが生成するため、AIへ採番や配信先の決定をさせません。
+
 Publisher履歴へ次を追加します。
 
 ```json

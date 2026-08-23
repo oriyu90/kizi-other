@@ -40,6 +40,7 @@
 - 現行配布版は `v0.3.0`、対象commitは `274798c4731f8a73a545b850d711b45f1e827a2d`、Releaseは `https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.3.0` とする。変更を始める前に同repositoryの `README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md` と最新Releaseを確認する。
 - `v0.3.0` はR2統合配信へ対応済みである。記事リポジトリへのpush後にGitHub Check Run `Publish to kizi / delivery`、`kizi.pages.dev/api/publish-status`、統合記事URLを順に確認し、push後の確認失敗は同じcommitを操作履歴から再確認する。Cloudflare資格情報をPublisherへ追加しない。
 - v0.3.0の通常入力はAIが作成したMarkdown、主ジャンル、任意の副ジャンルだけである。ID、Issue、公開日、order、author、language、readingMinutes、heroPool、status、配信先、公開URL、commit messageはアプリが決める。AI原稿のauthorとreadingMinutesは採用しない。
+- Publisherへ貼る原稿をAIに作らせる場合は、private Publisher repositoryの `docs/AI_ARTICLE_WRITING_RULES.txt` をAIへ全文渡す。AIが入力front matterへ書く項目は `title`、`subtitle`、`description`、`tags` だけとし、Publisherが生成する完全な保存後front matterと混同しない。
 - v0.3.0が実装済みの公開操作は新規追加と完全削除である。既存記事編集、公開終了、版移転、revert専用UIは未実装なので、存在を仮定しない。
 - v0.3.0はpreview時とcommit直前に3リポジトリのremote SHA snapshotを照合する。commit作成直後とpush直後にjournalへSHAを保存し、local-only commitはR2確認へ進めずrecovery refを案内する。完全削除後のcollection確認は記事IDの部分一致ではなく、catalogのid/url、RSSのlink/guid、sitemapのlocを完全一致で判定する。
 - 起動時と公開操作前に3リポジトリを同期し、2記事版の最新 `main` を横断してIDとIssueを採番する。記事操作はアプリ専用cloneとdetached worktreeで行い、検証後の全成果物を1commitで `main` へpushする。force pushとユーザーの通常cloneの変更は禁止する。
