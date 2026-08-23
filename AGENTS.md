@@ -58,6 +58,7 @@
 ## kizi Publisher Android continuity contract
 
 - Android版のソース正本はprivate repository `https://github.com/oriyu90/kizi-publisher-android` の `main` とする。対象はAndroid 8.0（API 26）以降のスマートフォン、タブレット、freeform window、Samsung DeX相当のdesktop windowingとする。
+- Android現行配布版は `v0.1.0`、対象commitは `296bf4c873944cb25c77c2d2f607c9cf61e5899b`、Releaseは `https://github.com/oriyu90/kizi-publisher-android/releases/tag/v0.1.0` とする。APK SHA-256は `5ebb506c1d2278a6c51dbc08122901641848577d81cc51c1c1d9903d82abb400`、AAB SHA-256は `1bdfc0f8cfeb10f11a9a3c5e85efba08c1894b581265ff75075493327408aa23`、署名証明書SHA-256は `29bc33a0240eb1f17dd5fb4748c1034a0b8663405a9c341ba192c520624a660f` である。署名は個人配布用の自己署名であり、Google Play App Signingは未使用である。
 - Android版はmacOS版と同じ記事入力・routing・横断採番・完全削除・公開完了契約を守る。端末へNode.jsやGit cloneを同梱せず、GitHub APIでprivate candidate branchを作り、記事リポジトリの `Android Publisher Candidate / validate` が生成・`npm run check`・変更allowlist検証を終えた単一commitだけをvalidated refへ置く。アプリは3リポジトリのremote SHAを再照合してからforceなしで `main` をfast-forwardする。
 - 通常認証はGitHub OAuth Device Flowを使い、client secretはAPKへ含めない。個人所有端末向け特例としてPersonal access tokenを設定画面から取り込めるが、tokenのソース、BuildConfig、APK asset、Git、Room、operation payload、ログ、Memoへの埋め込みは禁止する。OAuth token、refresh token、PAT、AI keyはAndroid Keystoreの別鍵を使うAES-256-GCM envelopeで暗号化し、logout時に暗号文と鍵aliasを削除する。
 - Android版の公開操作は新規追加と完全削除である。candidate作成後、validated commit作成後、main反映後のSHAと状態をRoom journalへ保存し、クラッシュ後はcandidate refまたは同じsource commitから再開・再確認する。候補refの再開時は既存workflow runを先に照合し、force pushを使わない。
