@@ -1,8 +1,8 @@
 # kizi システム設計・リポジトリ・保守契約 v2
 
-最終更新: 2026-08-22
+最終更新: 2026-08-24
 
-この文書は、kiziのサイト、記事リポジトリ、Cloudflare配信層、macOS投稿アプリを同じ仕様で保つための共通契約です。`kizi`、`kizi-kougaku`、`kizi-other`の3リポジトリで同一内容を維持します。AI原稿の形式は`docs/article-format.md`、作業者向けの短い強制ルールは`AGENTS.md`を正とします。
+この文書は、kiziのサイト、記事リポジトリ、Cloudflare配信層、macOS・Android投稿アプリを同じ仕様で保つための共通契約です。`kizi`、`kizi-kougaku`、`kizi-other`の3リポジトリで同一内容を維持します。AI原稿の形式は`docs/article-format.md`、作業者向けの短い強制ルールは`AGENTS.md`を正とします。
 
 ## 1. v2で変わること
 
@@ -63,6 +63,7 @@ https://kizi.pages.dev
 | `oriyu90/kizi-kougaku` | `engineering` | `categories`に`engineering`を含むMarkdown正本と生成物 |
 | `oriyu90/kizi-other` | `other` | `categories`に`engineering`を含まないMarkdown正本と生成物 |
 | `oriyu90/kizi-publisher-macos` | 該当なし | 投稿、生成、検証、Git更新、公開完了確認を行うprivateアプリ |
+| `oriyu90/kizi-publisher-android` | 該当なし | phone、tablet、DeXで投稿、remote検証、Git更新、公開完了確認を行うprivateアプリ |
 
 読者向け記事URLは版にかかわらず`https://kizi.pages.dev/articles/<ID>`です。`kizi-kougaku.pages.dev`と`kizi-other.pages.dev`は正規URLではなく、移行後はkiziへの互換転送だけを行います。
 
@@ -264,7 +265,19 @@ Publisher履歴へ次を追加します。
 
 commit作成後にpushできなかった場合はjournalのcommit SHAと`refs/kizi-publisher/recovery/<sha12>`を残します。再確認時に対象SHAがremote `main`と一致しなければR2確認へ進まず、recovery refを案内します。journalはfield、ISO日時、SHA、HTTPS URLを検証し、3 MiB/件・24 MiB/一覧を上限として壊れたrecordを隔離します。
 
-## 11. 公開状態と完了条件
+
+## 10A. Android Publisher v0.1.0の実装契約
+
+Android版の正本はprivate repository `oriyu90/kizi-publisher-android`です。Android 8.0（API 26）以降のphone、tablet、freeform window、Samsung DeX相当を対象とし、current window widthに応じてcompact（600 dp未満）、medium（600–839 dp）、expanded（840–1199 dp）、large（1200–1599 dp）、extra-large（1600 dp以上）をruntimeで再配置します。
+
+Android端末へNode.js、npm、Git cloneを同梱しません。公開時はGitHub Git Database APIで対象版のmainを親とするprivate candidate commitと`kizi-publisher-android/<operation UUID>`を作り、`Android Publisher Candidate / validate` workflowを起動します。workflowはoperation payloadのSHA-256、routing、front matter、翻訳、credential pattern、変更allowlistを検証し、Markdown、HTML、index、トップページ、RSS、sitemapを生成して`npm run check`を通します。成功時はmainを変更せず、親が元のmain SHAだけである単一commitを`kizi-publisher-validated/<operation UUID>`へ置きます。アプリはdirectoryを含む3リポジトリのmain SHAがpreview snapshotと一致することを再確認し、validated commitの親を照合してからGitHub refs APIの`force: false`で対象mainをfast-forwardします。
+
+GitHub認証の標準はOAuth Device Flowで、client secretをAPKへ入れません。個人所有端末向けの特例として、利用者が設定画面でPersonal access tokenを取り込む経路を認めます。この特例はcredentialのAPK埋め込みを認めるものではありません。OAuth access/refresh token、PAT、AI keyはAndroid Keystore内の別AES-256-GCM鍵で暗号化し、ソース、BuildConfig、APK asset、Git、Room、operation payload、ログ、Memo、backupへ保存しません。貼り付け値は取り込み直後にUIから消去し、無効なtokenはGitHub `/user`検証失敗時に暗号文と鍵aliasごと削除します。
+
+candidate ref、candidate commit、workflow run、source commit、snapshot、公開確認状態はRoom journalへ段階ごとに保存します。クラッシュ後はcandidate ref段階なら既存workflow runを先に照合して再開し、main反映後なら同じsource commitの`Publish to kizi / delivery`、`/api/publish-status`、統合記事URLまたは完全削除後のexact-match collection不在を再確認します。新しいcommitを重ねて成功扱いにせず、force pushを使いません。
+
+Android版Memoはapp internal storage、UTF-8、1 MiB上限、`AtomicFile`、symlink拒否です。700 ms debounce、focus解除、background移行、明示保存、Ctrl+Sに対応し、GitHub、記事リポジトリ、AI APIへ送信しません。Hallmark interaction stateはdefault、hover、focus、active、disabled、loading、error、successを分離し、visible controlは48×48 dp以上、focus ringは3 dpとします。
++## 11. 公開状態と完了条件
 
 ```text
 draft
@@ -417,6 +430,8 @@ v0.1.1の既存要件である、専用clone、detached worktree、file lock、a
 
 Publisherの契約、Release、journal schemaを変更した場合、`AGENTS.md`のcontinuity節とこの文書を3リポジトリで同じ更新単位に同期します。
 
+Android Publisherの正本はprivate repository `oriyu90/kizi-publisher-android`の`main`です。変更前に同repoの`README.md`、`docs/ARCHITECTURE.md`、`docs/THREAT_MODEL.md`、`docs/QUALITY_REPORT.md`、最新Releaseを確認します。candidate workflowまたはjournal schemaを変える場合は、Android repoと2記事リポジトリの互換性を同じ変更で検証します。
+
 ## 22. Definition of Done
 
 この仕様変更全体は次をすべて満たした時だけ完了です。
@@ -424,6 +439,7 @@ Publisherの契約、Release、journal schemaを変更した場合、`AGENTS.md`
 - `kizi`の`main`から統合UIとPages Functionsがデプロイされている。
 - R2 bucketと`ARTICLES` bindingが本番で有効である。
 - 2記事リポジトリにschemaVersion 2、同期script、workflow、kizi canonicalが入っている。
+- 2記事リポジトリにAndroid Publisher candidate workflowと同一versionのrunnerが入り、candidateからvalidated refまでmain非変更で検証できる。
 - 既存記事`2026.8.19.1`が工学カタログにあり、kizi URLで200を返す。
 - 旧記事URLがkiziへ転送される。
 - `/api/catalog`、RSS、sitemapが2版の和集合を返す。

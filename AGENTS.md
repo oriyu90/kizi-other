@@ -54,3 +54,14 @@
 - v0.3.0はmacOS 12.0以降、arm64/x64向けDMGを配布する。arm64 SHA-256は `19c548ccacf8a8fa6d4e60cc8aa6982c2c83fe717c87b96bc7947ea63eb8e038`、x64は `d2908eddc28f6c411362a0794a17caa54036f715b7ad1f7ae952a0847e8a1343` である。
 - v0.3.0 DMGはad-hoc署名、mount、`codesign --verify --deep --strict`、起動を確認済みだが、Developer ID署名とApple notarizationは未実施である。実機起動確認はmacOS 26.5のApple Silicon、x64はRosetta経由であり、macOS 12〜25とIntel実機は未確認である。
 - Publisherの契約やRelease情報を変更した場合、この節を `kizi`、`kizi-kougaku`、`kizi-other` の3リポジトリで同じcommit単位に同期する。
+
+## kizi Publisher Android continuity contract
+
+- Android版のソース正本はprivate repository `https://github.com/oriyu90/kizi-publisher-android` の `main` とする。対象はAndroid 8.0（API 26）以降のスマートフォン、タブレット、freeform window、Samsung DeX相当のdesktop windowingとする。
+- Android版はmacOS版と同じ記事入力・routing・横断採番・完全削除・公開完了契約を守る。端末へNode.jsやGit cloneを同梱せず、GitHub APIでprivate candidate branchを作り、記事リポジトリの `Android Publisher Candidate / validate` が生成・`npm run check`・変更allowlist検証を終えた単一commitだけをvalidated refへ置く。アプリは3リポジトリのremote SHAを再照合してからforceなしで `main` をfast-forwardする。
+- 通常認証はGitHub OAuth Device Flowを使い、client secretはAPKへ含めない。個人所有端末向け特例としてPersonal access tokenを設定画面から取り込めるが、tokenのソース、BuildConfig、APK asset、Git、Room、operation payload、ログ、Memoへの埋め込みは禁止する。OAuth token、refresh token、PAT、AI keyはAndroid Keystoreの別鍵を使うAES-256-GCM envelopeで暗号化し、logout時に暗号文と鍵aliasを削除する。
+- Android版の公開操作は新規追加と完全削除である。candidate作成後、validated commit作成後、main反映後のSHAと状態をRoom journalへ保存し、クラッシュ後はcandidate refまたは同じsource commitから再開・再確認する。候補refの再開時は既存workflow runを先に照合し、force pushを使わない。
+- main反映後はmacOS版と同じく `Publish to kizi / delivery`、`/api/publish-status`、統合記事URLまたは完全削除後のexact-match collection不在を順に確認し、すべて成功するまで完了扱いにしない。Cloudflare資格情報をAndroid版へ追加しない。
+- Memoはapp internal storageのUTF-8 plain text、上限1 MiB、`AtomicFile`、symlink拒否とし、700ms後・focus解除・background移行・明示保存・Ctrl+Sで保存する。暗号化しないためcredentialと未公開取材情報を保存しない。
+- GUIはHallmarkのdefault、hover、focus、active、disabled、loading、error、successを区別し、visible controlを48×48 dp以上、focus ringを3 dpとする。current window metricsに基づきcompact、medium、expanded、large、extra-largeをruntime再配置し、touch、mouse、trackpad、keyboard、画面回転、multi-window、DeXに対応する。
+- Android版の契約、Release、journal schemaまたはcandidate workflowを変更した場合、この節と `docs/system-design-and-operations.md` を `kizi`、`kizi-kougaku`、`kizi-other` の3リポジトリで同じ更新単位に同期する。

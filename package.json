@@ -5,6 +5,9 @@
   "scripts": {
     "article:next-id": "node scripts/next-article-id.mjs",
     "validate:articles": "node scripts/validate-articles.mjs",
-    "check": "node --check website/assets/app.js && node --check website/assets/reader.js && node --check website/service-worker-retire.js && node --check scripts/sync-delivery.mjs && npm run validate:articles"
+    "check": "node --check website/assets/app.js && node --check website/assets/reader.js && node --check website/service-worker-retire.js && node --check scripts/sync-delivery.mjs && node --check scripts/android-publisher-runner.mjs && npm run validate:articles"
+  },
+  "dependencies": {
+    "markdown-it": "15.0.0"
   }
 }

@@ -1,0 +1,60 @@
+name: Android Publisher candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation_id:
+        description: Application-owned operation UUID
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kizi-android-publisher-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate operation identity
+        env:
+          OPERATION_ID: ${{ inputs.operation_id }}
+        run: |
+          [[ "$OPERATION_ID" =~ ^[0-9a-f-]{36}$ ]]
+          test "$GITHUB_REF_NAME" = "kizi-publisher-android/$OPERATION_ID"
+      - name: Generate final candidate tree
+        env:
+          OPERATION_ID: ${{ inputs.operation_id }}
+        run: node scripts/android-publisher-runner.mjs "$OPERATION_ID"
+      - name: Validate generated repository
+        run: npm run check
+      - name: Create one deterministic validated commit
+        env:
+          OPERATION_ID: ${{ inputs.operation_id }}
+        run: |
+          BASE_SHA=$(node -e 'const p=require(`./publisher-operation-base.json`); process.stdout.write(p.baseSha)')
+          CREATED_AT=$(node -e 'const p=require(`./publisher-operation-base.json`); process.stdout.write(p.createdAt)')
+          rm publisher-operation-base.json
+          git reset --soft "$BASE_SHA"
+          git add -A
+          test -n "$(git diff --cached --name-only)"
+          git config user.name "kizi Publisher Android"
+          git config user.email "kizi-publisher-android@users.noreply.github.com"
+          GIT_AUTHOR_DATE="$CREATED_AT" GIT_COMMITTER_DATE="$CREATED_AT" git commit -m "article: Android Publisher $OPERATION_ID"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          REMOTE_MAIN=$(git ls-remote origin refs/heads/main | cut -f1)
+          test "$REMOTE_MAIN" = "$BASE_SHA"
+          git push origin "HEAD:refs/heads/kizi-publisher-validated/$OPERATION_ID"
+
