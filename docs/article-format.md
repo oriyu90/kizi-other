@@ -101,6 +101,7 @@ Publisher入力用front matterへAIが書くのは`title`、`subtitle`、`descri
 - 直接引用は必要最小限にし、主に要約で記述する。
 - 出典一覧には資料名、URL、発行元、公開日または参照日を付ける。
 - 日本語原稿が正本。投稿アプリは同じ記事IDのHTML内へ英語、ポルトガル語、ドイツ語、簡体字中国語、アラビア語の翻訳を生成できるが、別の手編集記事ファイルは作らない。
+- Markdownのfront matterは日本語の`title`、`subtitle`、`description`だけを正本として維持する。翻訳メタデータをAI入力Markdownへ埋め込まず、Publisherが本文翻訳と同じ処理で生成物へ付与する。
 
 ## 6. 禁止するMarkdown
 
@@ -124,6 +125,24 @@ Publisher入力用front matterへAIが書くのは`title`、`subtitle`、`descri
 6. リンク、翻訳、トップ画像プール、1記事1ファイルを検証する。
 7. 対象記事リポジトリの`main`へ1コミットで反映する。
 8. GitHub Actionsが変更された記事HTMLと版カタログをR2へ同期し、`kizi.pages.dev`の公開URLを有効化する。
+
+### 多言語メタデータの生成契約
+
+現行Markdown schemaVersion 2は変更しません。macOS Publisher v0.3.0とAndroid Publisher v0.1.1より後の次版では、本文翻訳に加えて`title`、`subtitle`、`description`を`en`、`pt`、`de`、`zh-CN`、`ar`へ翻訳し、`website/articles/index.json`の各記事へ次の生成フィールドを追加します。
+
+```json
+{
+  "translations": {
+    "en": {
+      "title": "Translated title",
+      "subtitle": "Translated subtitle",
+      "description": "Translated description"
+    }
+  }
+}
+```
+
+`translations`を生成する場合は5言語をすべて揃え、各言語に`title`、`subtitle`、`description`だけを入れます。移行中はフィールド欠落を許容し、kiziは記事メタデータだけ日本語へフォールバックします。サイト共通UIは常に選択言語で表示し、日本語へフォールバックさせません。次版Publisherはpreviewとcommit前検証で5言語の完全性、および同じ記事HTML内の本文翻訳との言語一致を確認します。
 
 配信先は次の通りです。
 

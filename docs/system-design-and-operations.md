@@ -279,6 +279,39 @@ GitHub認証の標準はOAuth Device Flowで、client secretをAPKへ入れま�
 PREVIEWED原稿はapp-private atomic payloadとRoom journalへ保存し、操作履歴から記録済み公開日・ID・Issue・本文の完全一致を検証して復元できます。candidate ref、candidate commit、workflow run、source commit、snapshot、公開確認状態もRoom journalへ段階ごとに保存します。クラッシュ後はcandidate ref段階なら既存workflow runを先に照合して再開し、main反映後なら同じsource commitの`Publish to kizi / delivery`、`/api/publish-status`、統合記事URLまたは完全削除後のexact-match collection不在を再確認します。新しいcommitを重ねて成功扱いにせず、force pushを使いません。
 
 Android版Memoはapp internal storage、UTF-8、1 MiB上限、`AtomicFile`、symlink拒否です。700 ms debounce、focus解除、background移行、明示保存、Ctrl+Sに対応し、GitHub、記事リポジトリ、AI APIへ送信しません。Hallmark interaction stateはdefault、hover、focus、active、disabled、loading、error、successを分離し、visible controlは48×48 dp以上、focus ringは3 dpとします。
+
+### 10A.1 ローカル削除後の復元と保守
+
+Android Publisherの開発cloneには正本データを置きません。source、設計資料、test、workflow、version履歴はprivate GitHub repositoryの`main`とReleaseを正とし、APK/AABはGitHub Releaseを配布正本とします。ローカルcloneを失った場合は残骸を推測で再利用せず、GitHub CLIが`oriyu90`としてprivate repositoryを読めることを確認してから復元します。
+
+```sh
+gh auth status
+gh repo clone oriyu90/kizi-publisher-android
+cd kizi-publisher-android
+git switch main
+git pull --ff-only
+git status --short
+gh release view v0.1.1 --repo oriyu90/kizi-publisher-android
+```
+
+`git status --short`は作業開始時に空でなければなりません。記事契約とremote runnerの統合試験には、同じ親directoryに最新`main`の`kizi-kougaku`と`kizi-other`を置きます。別配置では`KIZI_REPOSITORY_PARENT`を2リポジトリの親directoryへ設定します。Android側の変更前にAndroid repoの`AGENTS.md`、`README.md`、`docs/ARCHITECTURE.md`、`docs/THREAT_MODEL.md`、`docs/QUALITY_REPORT.md`、この共通設計、記事形式契約、macOS Publisherの現行仕様を照合します。
+
+fresh cloneのbuild前提はJDK 21、Android SDK Platform 36、Build Tools 36、adb/emulator、Node.js/npm、GitHub CLIです。Gradle wrapperと`package-lock.json`を正とし、任意のglobal Gradleや未固定dependencyへ置き換えません。初期化と必須gateは次です。
+
+```sh
+npm ci --ignore-scripts
+./gradlew quality bundleRelease
+./gradlew installDebug connectedDebugAndroidTest
+npm run check:secrets
+npm run test:runner
+```
+
+release署名正本はclone外の`~/Library/Application Support/kizi Publisher Android/signing/kizi-publisher-android-release.jks`と`password.txt`です。Gradleは両方が存在するときだけpersonal release署名を使います。このdirectoryは既存インストールへの更新互換性を決める唯一の秘密資産なので、Git、GitHub Release、チャット、ログ、通常のクラウド同期へ置かず、安全なオフライン別媒体にも保全します。cloneは削除可能ですが、署名directoryを削除してはいけません。OAuth client IDを使うbuildだけ未追跡`secrets.properties`の`githubOAuthClientId`または`KIZI_GITHUB_OAUTH_CLIENT_ID`を設定します。client secret、PAT、OAuth token、AI keyはbuild復元に不要で、source、設定ファイル、APKへ入れません。
+
+保守releaseではversionCodeとversionNameを単調増加させ、全gate後にminified APK/AABを生成します。APKはAndroid SDKの`apksigner verify --verbose --print-certs`でv2/v3署名と証明書SHA-256を確認し、AABも署名済みであることを確認します。直前版が入った端末へ`adb install -r app/build/outputs/apk/release/app-release.apk`で上書きし、version、cold launch、journal/Memoの継続を確認します。APK/AABのbyte sizeとSHA-256を`docs/QUALITY_REPORT.md`へ記録し、source commitをprivate `main`へpushして同commitの`Quality` Action成功後に、そのcommitをtargetとするprivate Releaseへ両artifactを添付します。GitHub Release assetのsize/digest、tag、target commitを再照合してから、この共通文書の現行版、commit、Release URL、hashを3リポジトリで同時更新します。
+
+source cloneの削除前には、未push・未追跡ファイルがないこと、local HEADとremote `main`が一致すること、必要なtagとRelease assetが存在すること、Quality Actionが成功していることを確認します。source cloneの削除はインストール済みアプリのdataへ影響しません。一方、アプリのuninstall、clear data、端末初期化はKeystore鍵、設定、Memo、Room journal、atomic operation payloadを失います。credentialは移行せず再認証する設計です。端末dataを消す前は公開操作がterminalであることを確認し、必要なMemoだけcredentialと未公開取材情報を除いて手動退避します。非terminal操作がある状態でアプリdataを消さず、やむを得ない場合はGitHub上のapplication-owned candidate/validated refとworkflow runを手動監査します。
+
 ## 11. 公開状態と完了条件
 
 ```text
@@ -321,12 +354,19 @@ draft
 
 Service WorkerはUI shellだけを事前キャッシュします。記事一覧と記事本文はネットワーク優先で、成功応答を実行時キャッシュできます。特定記事を`CORE_ASSETS`へ固定しません。R2やFunctions障害時に、既読記事のブラウザキャッシュがあれば利用できます。
 
+### UIと記事メタデータの多言語契約
+
+kiziの共通UI、動的記事一覧、hero、メニュー、設定、お気に入り、あとで読む、パンくず、アクセシビリティ名、404は、IndexedDBで選択された言語を唯一の表示言語とします。動的な記事タイトル・副題・説明はR2カタログの任意`translations.<language>`を使い、フィールドがない既存記事だけ日本語メタデータへフォールバックします。共通UI文字列を日本語へフォールバックしてはいけません。
+
+macOS Publisher v0.3.0とAndroid Publisher v0.1.1より後の次版は、既存の本文翻訳処理を拡張し、`title`、`subtitle`、`description`を5言語へ翻訳して`website/articles/index.json`へ生成します。Markdown schemaVersion 2、AI入力front matter、採番、routingは変更しません。記事リポジトリのvalidatorとkizi deliveryは、`translations`が存在する場合に5言語と3フィールドが完全であることを検証します。移行完了まではフィールド自体を任意として後方互換を保ちます。
+
 ## 15. 対応ブラウザとアクセシビリティ
 
 - 標準HTML、CSS、JavaScript、IndexedDBを優先します。
 - IndexedDB失敗時はlocalStorage、ResizeObserver不在時はscroll/resizeへフォールバックします。
 - JavaScript無効時でもトップに埋め込まれた最新記事と記事HTML本文を読める構造を保ちます。
 - Safari、Chrome、Edge、Firefoxの現行メジャー、320 CSS pxから8K、LTR/RTL、200%ズームを回帰対象にします。
+- 横長かつ低いviewportでは8件のメニュー項目がすべてviewport内へ収まるよう基本フォントと縦余白を縮小し、収まらないズーム・極端な高さではメニュー自体を縦スクロール可能にします。844×390 CSS pxを横長回帰基準に含め、項目周囲のテーマ連動fogで背景との判読性を保ちます。
 - キーボード、focus ring、44 CSS px以上の操作領域、prefers-reduced-motionを維持します。
 
 ## 16. Cloudflare初期構築
@@ -428,11 +468,83 @@ GCは通常のPublisher公開処理へ混ぜません。catalogとstatusを削�
 
 Publisherの正本はprivate repository `oriyu90/kizi-publisher-macos`の`main`です。現行版はv0.3.0、commit `274798c4731f8a73a545b850d711b45f1e827a2d`、Releaseは`https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.3.0`です。変更前に同repoの`README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md`、最新Releaseを確認します。
 
-v0.1.1の既存要件である、専用clone、detached worktree、file lock、atomic journal、remote SHA確認、Git recovery ref、safeStorage、secret非出力、force push禁止を維持します。v2対応では本章10のdelivery状態と確認URLを追加し、既存journalを読み込める後方互換migrationを実装します。
+macOS Publisherの既存要件である、専用clone、detached worktree、file lock、atomic journal、remote SHA確認、Git recovery ref、safeStorage、secret非出力、force push禁止を維持します。v2対応では本章10のdelivery状態と確認URLを追加し、既存journalを読み込める後方互換migrationを実装します。
 
 Publisherの契約、Release、journal schemaを変更した場合、`AGENTS.md`のcontinuity節とこの文書を3リポジトリで同じ更新単位に同期します。
 
 Android Publisherの正本はprivate repository `oriyu90/kizi-publisher-android`の`main`です。変更前に同repoの`README.md`、`docs/ARCHITECTURE.md`、`docs/THREAT_MODEL.md`、`docs/QUALITY_REPORT.md`、最新Releaseを確認します。candidate workflowまたはjournal schemaを変える場合は、Android repoと2記事リポジトリの互換性を同じ変更で検証します。
+
+### 21.1 正本と履歴資料
+
+Publisherを含む5リポジトリのローカルcloneは使い捨てです。正本と現行配布物は次のGitHub上の情報です。
+
+| 対象 | 正本 | 現行Release |
+| --- | --- | --- |
+| 統合配信 | `oriyu90/kizi`の`main` | Pages本番は同`main`からdeploy |
+| 工学記事 | `oriyu90/kizi-kougaku`の`main` | 同`main`からR2同期 |
+| 非工学記事 | `oriyu90/kizi-other`の`main` | 同`main`からR2同期 |
+| macOS Publisher | private `oriyu90/kizi-publisher-macos`の`main` | `v0.3.0`、commit `274798c4731f8a73a545b850d711b45f1e827a2d` |
+| Android Publisher | private `oriyu90/kizi-publisher-android`の`main` | `v0.1.1`、commit `62c74af7e87d74a91187feacbc5f9a0838802955` |
+
+`kizi/docs/mac-publisher-app-design.md`は実装前のv1案を失わないための履歴資料で、現行仕様の正本ではありません。既存記事編集、公開終了、版移転、revert専用UIなど、現行Releaseに存在しない案を実装済みと解釈してはいけません。
+
+### 21.2 新しいMacへの復元
+
+GitHub CLIで`oriyu90`として認証した後、空の親directoryへ5リポジトリをcloneします。既存のローカルdirectoryをコピーして正本にしません。
+
+```sh
+gh auth status
+gh repo clone oriyu90/kizi
+gh repo clone oriyu90/kizi-kougaku
+gh repo clone oriyu90/kizi-other
+gh repo clone oriyu90/kizi-publisher-macos
+gh repo clone oriyu90/kizi-publisher-android
+```
+
+各repoで`origin`が期待するGitHub repositoryと完全一致し、`main`が`origin/main`と一致し、worktreeがcleanであることを確認します。共通文書3ファイルは3リポジトリ間でbyte一致させます。
+
+```sh
+git remote get-url origin
+git fetch --prune origin
+git status --short
+git rev-list --left-right --count main...origin/main
+shasum -a 256 AGENTS.md docs/article-format.md docs/system-design-and-operations.md
+```
+
+通常開発は各repoの最新`main`から始めます。過去Releaseを再現するときだけ対象commitをdetached checkoutします。
+
+- 共通3リポジトリ: 依存関係を復元後、それぞれ`npm run check`。
+- macOS Publisher: Node.js/npmを用い、`npm ci`、`npm run quality`、`npm run dist:mac`。v0.3.0の再現は対象commitを使い、arm64/x64 DMGの署名、mount、起動、SHA-256をRelease記録と照合する。
+- Android Publisher: JDK 21、Android SDK/Build Tools 36、Node.jsを用い、`npm ci --ignore-scripts`、`./gradlew quality bundleRelease`、`./gradlew installDebug connectedDebugAndroidTest`、`npm run check:secrets`、`npm run test:runner`。v0.1.1の再現は対象commitと同じ外部署名鍵を使い、APK/AABと署名証明書のSHA-256をRelease記録と照合する。
+
+Developer ID証明書とApple notarizationはv0.3.0に含まれません。Android v0.1.1は自己署名で、Google Play App Signingを使用していません。Release asset自体はGitHub Releaseから復元し、ローカルの`dist`、`release`、`build`を配布正本にしません。
+
+### 21.3 Git外で別途保全するもの
+
+次はGit cloneを削除してもよいかどうかと分けて判断します。
+
+| データ | 場所 | 取扱い |
+| --- | --- | --- |
+| Android更新署名鍵 | `~/Library/Application Support/kizi Publisher Android/signing/kizi-publisher-android-release.jks` と `password.txt` | 既存APKの更新互換性に必須。mode 0600を維持し、repositoryや一般クラウド同期ではなく暗号化した別媒体へ二重保管する |
+| macOS Publisher runtime | `~/Library/Application Support/kizi Publisher/` | 設定、暗号化AI key、Memo、journalを含む。未完了操作のremote状態を確定し、必要なMemoを安全に退避するまで削除しない。中の専用cloneは再生成可能 |
+| Android Publisher runtime | Android app internal storage / Keystore | Room journal、preview payload、Memo、暗号化tokenを含む。未完了操作の再開・確認やMemoが必要なら、アプリdataや端末を消去しない |
+| GitHub / Cloudflare設定 | GitHub Actions、repository settings、Cloudflare Pages/R2 | workflowとbinding名はGitに残すが、secret値はGitへ残さない。消失時は権限を最小化した新しいsecretを管理画面で再設定する |
+
+PAT、OAuth token、AI key、Cloudflare token、署名password、未公開取材情報を、保守文書、Issue、Release note、退避branch、ログへコピーしてはいけません。macOS MemoとAndroid Memoも暗号化されないため、credentialや未公開取材情報のバックアップ先に使いません。
+
+再生成可能で保全不要なのは`node_modules`、`.wrangler`、macOS Publisherの`dist`、`release`、`test-results`、Androidの`.gradle`、`build`、`app/build`、`local.properties`です。
+
+### 21.4 ローカルdirectory削除前チェック
+
+1. 5リポジトリで`git status --short --untracked-files=all`を確認し、残す差分をすべてcommitする。
+2. `git log --oneline @{upstream}..HEAD`と`git branch -vv`で未push commitを確認する。未統合作業は`codex/`branchへpushし、branch名とcommit SHAをこの文書へ記録する。
+3. `gh release view`でmacOS v0.3.0とAndroid v0.1.1のasset、target commit、digestがGitHub上に存在することを確認する。
+4. macOS/Android Publisherの操作履歴に未完了・push未確認の操作がないことを確認する。ある場合は同じcommitを再確認し、完了または明示的な復旧手順を記録する。
+5. Android更新署名鍵を別媒体から復元できることを検証する。必要なMemoはcredentialを含まないことを確認して別途保全する。
+6. 3共通文書のhash一致と各repoの品質gateを確認する。
+7. 最後にremote branchをWebまたは`gh api`で確認してからcloneだけを削除する。Application SupportやAndroid app dataはcloneとは別物として扱い、一括削除しない。
+
+未統合作業の退避branchは完成版や本番deployを意味しません。再開時は記録されたcommitから新しい作業branchを作り、最新`main`へrebaseまたはcherry-pickし、競合解消と全品質gateを終えてから通常のreview・release手順へ進みます。
 
 ## 22. Definition of Done
 
