@@ -128,7 +128,7 @@ Publisher入力用front matterへAIが書くのは`title`、`subtitle`、`descri
 
 ### 多言語メタデータの生成契約
 
-現行Markdown schemaVersion 2は変更しません。macOS Publisher v0.3.0より後の次版とAndroid Publisher v0.2.0は、本文翻訳に加えて`title`、`subtitle`、`description`を`en`、`pt`、`de`、`zh-CN`、`ar`へ翻訳し、`website/articles/index.json`の各記事へ次の生成フィールドを追加します。
+現行Markdown schemaVersion 2は変更しません。macOS Publisher v0.4.0とAndroid Publisher v0.2.0は、本文翻訳に加えて`title`、`subtitle`、`description`を`en`、`pt`、`de`、`zh-CN`、`ar`へ翻訳し、`website/articles/index.json`の各記事へ次の生成フィールドを追加します。
 
 ```json
 {
@@ -142,7 +142,7 @@ Publisher入力用front matterへAIが書くのは`title`、`subtitle`、`descri
 }
 ```
 
-`translations`を生成する場合は5言語をすべて揃え、各言語に`title`、`subtitle`、`description`だけを入れます。移行中はフィールド欠落を許容し、kiziは記事メタデータだけ日本語へフォールバックします。サイト共通UIは常に選択言語で表示し、日本語へフォールバックさせません。次版Publisherはpreviewとcommit前検証で5言語の完全性、および同じ記事HTML内の本文翻訳との言語一致を確認します。
+`translations`を生成する場合は5言語をすべて揃え、各言語に`title`、`subtitle`、`description`だけを入れます。移行中はフィールド欠落を許容し、kiziは記事メタデータだけ日本語へフォールバックします。サイト共通UIは常に選択言語で表示し、日本語へフォールバックさせません。両Publisherはpreviewとcommit前検証で5言語の完全性、および同じ記事HTML内の本文翻訳との言語一致を確認します。
 
 配信先は次の通りです。
 

@@ -224,9 +224,9 @@ Actionは同期前に`git ls-remote origin refs/heads/main`を実行し、`GITHU
 
 この値はStandard storageの推定であり、Analyticsの集計遅延、Infrequent Accessのretrieval・最低保存期間、Data Catalog等の追加料金、請求単位の丸めを完全には再現しません。請求書の確定値ではなく、正確な課金判断はCloudflare dashboardを正とします。APIが利用する`CLOUDFLARE_ACCOUNT_ID`とread-onlyの`CLOUDFLARE_ANALYTICS_TOKEN`はkizi Pages Secretだけに置き、Publisher、GitHub、browserへ渡しません。未設定時は503と公式無料枠を返し、Publisherは「実測値なし」と表示します。
 
-## 10. Publisher v0.3.0の実装契約
+## 10. Publisher v0.4.0の実装契約
 
-v0.2.1までのR2統合配信、safeStorage、journal、detached worktree、横断競合・削除確認・クラッシュ復旧を維持し、v0.3.0では投稿入力と公開契約を変えずにローカルMemoを追加しました。
+R2統合配信、safeStorage、journal、detached worktree、横断競合・削除確認・クラッシュ復旧、ローカルMemoを維持し、v0.4.0では入力Markdown schemaを変えずに本文と記事metadataの5言語翻訳を追加しました。
 
 1. 起動時と公開前に`kizi`、`kizi-kougaku`、`kizi-other`の`site.config.json`を読み、schemaVersion 2とリポジトリ組を確認する。
 2. 2記事版の最新`main`を横断してIDとIssueを採番し、preview時とcommit直前にdirectoryを含む3リポジトリのremote SHA snapshotが一致することを確認する。
@@ -238,6 +238,7 @@ v0.2.1までのR2統合配信、safeStorage、journal、detached worktree、横�
 8. ここまで成功した時だけ、新規追加はjournalを`published`、完全削除は`completed`にする。
 9. 起動同期と「配信・R2」画面で`/api/health`と`/api/r2-usage`を取得し、配信commitと無料枠の残量を表示する。
 10. 「操作履歴」と「設定」の間のMemoで、AI執筆ルールをローカルの`memo.txt`へ自動保存する。
+11. OpenAI互換APIから各言語の`title`、`subtitle`、`description`、`body`だけを持つ厳密なJSONを取得し、5言語と4fieldが完全でなければcommit前に停止する。
 
 Publisher自身はR2へアップロードせず、Cloudflare資格情報を保存しません。GitHub Actionが遅延・失敗した場合は`push済み・配信同期待ち`として記録し、同じcommitのCheck Runとstatusを再確認します。新しい記事commitを重ねて回避しません。
 
@@ -261,7 +262,7 @@ Publisher履歴へ次を追加します。
 }
 ```
 
-完全削除では対象記事リポジトリから正本と生成物を1commitで削除し、Action成功後にkizi URLが404であることを確認します。collectionは記事IDの部分一致では判定せず、catalogの`id`/`url`、RSSの`link`/`guid`、sitemapの`loc`から完全一致参照が消えたことを検証します。既存記事編集、公開終了、版移転、revert専用UIはv0.3.0では未実装であり、実装前提にしません。
+完全削除では対象記事リポジトリから正本と生成物を1commitで削除し、Action成功後にkizi URLが404であることを確認します。collectionは記事IDの部分一致では判定せず、catalogの`id`/`url`、RSSの`link`/`guid`、sitemapの`loc`から完全一致参照が消えたことを検証します。既存記事編集、公開終了、版移転、revert専用UIはv0.4.0では未実装であり、実装前提にしません。
 
 commit作成後にpushできなかった場合はjournalのcommit SHAと`refs/kizi-publisher/recovery/<sha12>`を残します。再確認時に対象SHAがremote `main`と一致しなければR2確認へ進まず、recovery refを案内します。journalはfield、ISO日時、SHA、HTTPS URLを検証し、3 MiB/件・24 MiB/一覧を上限として壊れたrecordを隔離します。
 
@@ -358,7 +359,7 @@ Service WorkerはUI shellだけを事前キャッシュします。記事一覧�
 
 kiziの共通UI、動的記事一覧、hero、メニュー、設定、お気に入り、あとで読む、パンくず、アクセシビリティ名、404は、IndexedDBで選択された言語を唯一の表示言語とします。動的な記事タイトル・副題・説明はR2カタログの任意`translations.<language>`を使い、フィールドがない既存記事だけ日本語メタデータへフォールバックします。共通UI文字列を日本語へフォールバックしてはいけません。
 
-macOS Publisher v0.3.0より後の次版とAndroid Publisher v0.2.0は、既存の本文翻訳処理を拡張し、`title`、`subtitle`、`description`を5言語へ翻訳して`website/articles/index.json`へ生成します。Markdown schemaVersion 2、AI入力front matter、採番、routingは変更しません。記事リポジトリのvalidatorとkizi deliveryは、`translations`が存在する場合に5言語と3フィールドが完全であることを検証します。移行完了まではフィールド自体を任意として後方互換を保ちます。
+macOS Publisher v0.4.0とAndroid Publisher v0.2.0は、本文と`title`、`subtitle`、`description`を5言語へ翻訳して`website/articles/index.json`へ生成します。Markdown schemaVersion 2、AI入力front matter、採番、routingは変更しません。記事リポジトリのvalidatorとkizi deliveryは、`translations`が存在する場合に5言語と3フィールドが完全であることを検証します。移行完了まではフィールド自体を任意とし、欠落した既存記事だけ日本語metadataへフォールバックします。
 
 ## 15. 対応ブラウザとアクセシビリティ
 
@@ -466,7 +467,7 @@ GCは通常のPublisher公開処理へ混ぜません。catalogとstatusを削�
 
 ## 21. Publisher引き継ぎ
 
-Publisherの正本はprivate repository `oriyu90/kizi-publisher-macos`の`main`です。現行版はv0.3.0、commit `274798c4731f8a73a545b850d711b45f1e827a2d`、Releaseは`https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.3.0`です。変更前に同repoの`README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md`、最新Releaseを確認します。
+Publisherの正本はprivate repository `oriyu90/kizi-publisher-macos`の`main`です。現行版はv0.4.0、commit `9fea968349d90eb23bafaec7c93fe753bd84daeb`、Releaseは`https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.4.0`です。変更前に同repoの`README.md`、`docs/ARCHITECTURE.md`、`docs/QUALITY_REPORT.md`、最新Releaseを確認します。
 
 macOS Publisherの既存要件である、専用clone、detached worktree、file lock、atomic journal、remote SHA確認、Git recovery ref、safeStorage、secret非出力、force push禁止を維持します。v2対応では本章10のdelivery状態と確認URLを追加し、既存journalを読み込める後方互換migrationを実装します。
 
@@ -483,7 +484,7 @@ Publisherを含む5リポジトリのローカルcloneは使い捨てです。�
 | 統合配信 | `oriyu90/kizi`の`main` | Pages本番は同`main`からdeploy |
 | 工学記事 | `oriyu90/kizi-kougaku`の`main` | 同`main`からR2同期 |
 | 非工学記事 | `oriyu90/kizi-other`の`main` | 同`main`からR2同期 |
-| macOS Publisher | private `oriyu90/kizi-publisher-macos`の`main` | `v0.3.0`、commit `274798c4731f8a73a545b850d711b45f1e827a2d` |
+| macOS Publisher | private `oriyu90/kizi-publisher-macos`の`main` | `v0.4.0`、commit `9fea968349d90eb23bafaec7c93fe753bd84daeb` |
 | Android Publisher | private `oriyu90/kizi-publisher-android`の`main` | `v0.2.0`、commit `6a05e7edd38735d57b1ec1f6f0b69acd91ff1f3a` |
 
 `kizi/docs/mac-publisher-app-design.md`は実装前のv1案を失わないための履歴資料で、現行仕様の正本ではありません。既存記事編集、公開終了、版移転、revert専用UIなど、現行Releaseに存在しない案を実装済みと解釈してはいけません。
@@ -514,10 +515,10 @@ shasum -a 256 AGENTS.md docs/article-format.md docs/system-design-and-operations
 通常開発は各repoの最新`main`から始めます。過去Releaseを再現するときだけ対象commitをdetached checkoutします。
 
 - 共通3リポジトリ: 依存関係を復元後、それぞれ`npm run check`。
-- macOS Publisher: Node.js/npmを用い、`npm ci`、`npm run quality`、`npm run dist:mac`。v0.3.0の再現は対象commitを使い、arm64/x64 DMGの署名、mount、起動、SHA-256をRelease記録と照合する。
+- macOS Publisher: Node.js/npmを用い、`npm ci`、`npm run quality`、`npm run dist:mac`。v0.4.0の再現は対象commitを使い、arm64/x64 DMGの署名、mount、起動、SHA-256をRelease記録と照合する。
 - Android Publisher: JDK 21、Android SDK/Build Tools 36、Node.jsを用い、`npm ci --ignore-scripts`、`./gradlew quality bundleRelease`、`./gradlew installDebug connectedDebugAndroidTest`、`npm run check:secrets`、`npm run test:runner`。v0.2.0の再現は対象commitと同じ外部署名鍵を使い、APK/AABと署名証明書のSHA-256をRelease記録と照合する。署名済みAPKはランダム化された署名byteにより別buildでhashが変わり得るため、照合対象はReleaseへ実際に添付したassetとする。
 
-Developer ID証明書とApple notarizationはv0.3.0に含まれません。Android v0.2.0は自己署名で、Google Play App Signingを使用していません。Release asset自体はGitHub Releaseから復元し、ローカルの`dist`、`release`、`build`を配布正本にしません。
+Developer ID証明書とApple notarizationはv0.4.0に含まれません。Android v0.2.0は自己署名で、Google Play App Signingを使用していません。Release asset自体はGitHub Releaseから復元し、ローカルの`dist`、`release`、`build`を配布正本にしません。
 
 ### 21.3 Git外で別途保全するもの
 
@@ -538,7 +539,7 @@ PAT、OAuth token、AI key、Cloudflare token、署名password、未公開取材
 
 1. 5リポジトリで`git status --short --untracked-files=all`を確認し、残す差分をすべてcommitする。
 2. `git log --oneline @{upstream}..HEAD`と`git branch -vv`で未push commitを確認する。未統合作業は`codex/`branchへpushし、branch名とcommit SHAをこの文書へ記録する。
-3. `gh release view`でmacOS v0.3.0とAndroid v0.2.0のasset、target commit、digestがGitHub上に存在することを確認する。
+3. `gh release view`でmacOS v0.4.0とAndroid v0.2.0のasset、target commit、digestがGitHub上に存在することを確認する。
 4. macOS/Android Publisherの操作履歴に未完了・push未確認の操作がないことを確認する。ある場合は同じcommitを再確認し、完了または明示的な復旧手順を記録する。
 5. Android更新署名鍵を別媒体から復元できることを検証する。必要なMemoはcredentialを含まないことを確認して別途保全する。
 6. 3共通文書のhash一致と各repoの品質gateを確認する。
@@ -563,6 +564,12 @@ PAT、OAuth token、AI key、Cloudflare token、署名password、未公開取材
 ### 21.6 2026-08-24 Android v0.2.0更新記録
 
 Android Publisher v0.2.0でcandidate payload schema 2、本文と3項目の多言語メタデータ生成、5言語と4fieldの二重検証を導入しました。工学・非工学runnerはそれぞれcommit `a150bb70759cd039b2548a788bc5d1343807cc4b`と`ab3713ab23c6bd222aed287eca95781506c18080`でmainへ反映済みで、同commitの`Publish to kizi`は成功しています。Android private `Quality`、schema 2の両版生成、schema 1後方互換、完全削除、署名、v0.1.1からの更新install、phone/DeX UI、メモリ回帰を確認済みです。
+
+### 21.7 2026-08-24 macOS v0.4.0更新記録
+
+macOS Publisher v0.4.0で本文と`title`、`subtitle`、`description`の5言語翻訳、厳密な4field JSON検証、schema 2翻訳cache、版catalogの多言語metadata生成を導入しました。source正本はcommit `9fea968349d90eb23bafaec7c93fe753bd84daeb`、Releaseは`https://github.com/oriyu90/kizi-publisher-macos/releases/tag/v0.4.0`です。arm64 DMGのSHA-256は`0d9924708d8a64fc1f773d0c391c1f6948f93b58a0fda8303d903483b80b17d5`、x64は`614bd97efc593e5cad327e1ffd535aaabad38e1aa73b7a4739e04332e28bd4d6`です。
+
+統合サイトはcommit `b920226`で言語選択に応じてcatalogから記事タイトル、副題、description、OG/Twitter metadata、保存名を反映し、フィールドのない既存記事は日本語へフォールバックします。工学記事の既存HTMLはcommit `81aebfa`でreader v13へ更新済みです。macOSの36単体試験、両版統合試験、Electron UI・メモリ試験、arm64/x64 DMGのmount・署名・起動検証に合格し、実記事の追加・削除は行っていません。
 
 ## 22. Definition of Done
 
