@@ -55,8 +55,10 @@ function validateMetadata(metadata, site) {
   assert(parts && metadata.publishedAt === `${parts[1]}-${parts[2].padStart(2, "0")}-${parts[3].padStart(2, "0")}` && metadata.order === Number(parts[4]), "id/date/order mismatch");
 }
 
-function articleEntry(metadata) {
-  return { id: metadata.id, date: metadata.publishedAt, order: metadata.order, category: metadata.categories[0], secondaryCategories: metadata.categories.slice(1), title: metadata.title, description: metadata.description, readingMinutes: metadata.readingMinutes, author: metadata.author, url: `/articles/${metadata.id}` };
+function articleEntry(metadata, translations) {
+  const entry = { id: metadata.id, date: metadata.publishedAt, order: metadata.order, category: metadata.categories[0], secondaryCategories: metadata.categories.slice(1), title: metadata.title, description: metadata.description, readingMinutes: metadata.readingMinutes, author: metadata.author, url: `/articles/${metadata.id}` };
+  if (translations) entry.translations = translations;
+  return entry;
 }
 
 function renderArticlePage(metadata, body, translations, site, manifest) {
@@ -81,7 +83,7 @@ function renderArticlePage(metadata, body, translations, site, manifest) {
   <link rel="apple-touch-icon" href="/assets/icons/kizi-192.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="alternate" type="application/rss+xml" title="kizi RSS" href="/feed.xml">
-  <link rel="stylesheet" href="/assets/styles.css?v=11">
+  <link rel="stylesheet" href="/assets/styles.css?v=12">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="kizi">
   <meta property="og:locale" content="ja_JP">
@@ -101,7 +103,7 @@ function renderArticlePage(metadata, body, translations, site, manifest) {
   <nav class="main-nav" aria-label="メインナビゲーション" data-main-nav><a href="/#latest">最新記事</a><a href="/#categories">ジャンル</a><a href="/favorites">お気に入り</a><a href="/read-later">あとで読む</a><button class="nav-settings" type="button" data-settings-open>閲覧設定</button></nav><div class="nav-backdrop" aria-hidden="true" data-menu-backdrop></div><div class="article-progress" aria-hidden="true"><span data-reading-progress></span></div>
   <main><header class="article-hero"><nav class="breadcrumbs" aria-label="パンくずリスト"><a href="/">ホーム</a><span>/</span><a href="/#${primary}">${escapeHtml(categoryNames[primary])}</a><span>/</span><span aria-current="page">Issue ${String(metadata.issue).padStart(3, "0")}</span></nav><p class="eyebrow">Issue ${String(metadata.issue).padStart(3, "0")} / Deep read</p><div>${tags}</div><h1 class="article-title">${escapeHtml(metadata.title)}</h1><p class="article-subtitle">${escapeHtml(metadata.subtitle)}</p><div class="article-meta"><time datetime="${metadata.publishedAt}">${metadata.publishedAt.replaceAll("-", ".")}</time><span>約${metadata.readingMinutes}分</span><span>文 / ${escapeHtml(metadata.author)}</span><span>最終更新 ${metadata.updatedAt.replaceAll("-", ".")}</span></div><div class="article-actions"><button class="favorite-button" type="button" aria-pressed="false" data-favorite-toggle data-article-slug="${metadata.id}" data-article-url="/articles/${metadata.id}" data-article-title="${escapeHtml(metadata.title)}" data-article-date="${metadata.publishedAt}"><span data-favorite-label>お気に入りに追加</span></button><button class="read-later-button" type="button" aria-pressed="false" data-read-later-toggle data-article-slug="${metadata.id}" data-article-url="/articles/${metadata.id}" data-article-title="${escapeHtml(metadata.title)}" data-article-date="${metadata.publishedAt}"><span data-read-later-label>あとで読む</span></button></div></header>
   <figure class="article-cover"><img src="/assets/images/${escapeHtml(image)}" data-random-image="${metadata.heroPool}" alt="${escapeHtml(categoryNames[metadata.heroPool])}ジャンルのイメージ" width="1672" height="941" fetchpriority="high"></figure><div class="article-layout"><aside class="article-aside" aria-label="記事情報"><div class="article-aside-inner"><h2>Languages</h2><p>${Object.entries(languageLabels).map(([code, label]) => `${escapeHtml(label)} (${code})`).join("<br>")}</p></div></aside><article class="article-body" id="article-body" data-article-body>${markdown.render(body)}</article></div><div class="article-translations" hidden aria-hidden="true">${translationTemplates}</div></main>
-  <footer class="site-footer"><div class="footer-top"><p class="footer-statement"><span>飽くなき</span><em>知の探究</em></p><nav class="footer-links"><a href="/">トップページ</a><a href="/feed.xml">RSS</a><a href="https://studio-rizi.pages.dev/" target="_blank" rel="author noopener">Yuki Orita / Studio Rizi ↗</a></nav></div><div class="footer-bottom"><span>© 2026 kizi</span><span>Independent news / Hiroshima, Japan</span></div></footer><script src="/assets/app.js?v=8" defer></script><script src="/assets/reader.js?v=10" defer></script>
+  <footer class="site-footer"><div class="footer-top"><p class="footer-statement"><span>飽くなき</span><em>知の探究</em></p><nav class="footer-links"><a href="/">トップページ</a><a href="/feed.xml">RSS</a><a href="https://studio-rizi.pages.dev/" target="_blank" rel="author noopener">Yuki Orita / Studio Rizi ↗</a></nav></div><div class="footer-bottom"><span>© 2026 kizi</span><span>Independent news / Hiroshima, Japan</span></div></footer><script src="/assets/app.js?v=8" defer></script><script src="/assets/reader.js?v=13" defer></script>
 </body></html>
 `;
 }
@@ -123,7 +125,7 @@ assert(uuidPattern.test(operationId), "invalid operation UUID");
 const stat = await lstat(payloadPath); assert(stat.isFile() && !stat.isSymbolicLink() && stat.size <= maxPayloadBytes, "unsafe operation payload");
 const payload = JSON.parse(await readFile(payloadPath, "utf8"));
 const { digest, ...core } = payload;
-assert(payload.schemaVersion === 1 && payload.operationId === operationId && ["create", "delete"].includes(payload.operation), "invalid payload identity");
+assert([1, 2].includes(payload.schemaVersion) && payload.operationId === operationId && ["create", "delete"].includes(payload.operation), "invalid payload identity");
 assert(typeof digest === "string" && digest === sha256(JSON.stringify(core)), "payload digest mismatch");
 assert(shaPattern.test(payload.baseSha) && payload.snapshot?.[payload.edition] === payload.baseSha, "invalid base snapshot");
 assert(new Date(payload.createdAt).toISOString() === payload.createdAt && Math.abs(Date.now() - Date.parse(payload.createdAt)) < 7 * 24 * 60 * 60 * 1000, "invalid operation time");
@@ -141,13 +143,32 @@ if (payload.operation === "create") {
   const metadata = create.metadata; articleId = metadata.id; validateMetadata(metadata, site);
   assert(!manifest.articles.some((article) => article.id === articleId), "article already exists");
   assert(create.canonicalMarkdown === canonicalMarkdown(metadata, create.body), "canonical Markdown mismatch");
-  assert(Object.keys(create.translations).sort().join(",") === ["ar", "de", "en", "pt", "zh-CN"].sort().join(","), "translation set mismatch");
+  const requiredLanguages = ["ar", "de", "en", "pt", "zh-CN"];
+  assert(Object.keys(create.translations).sort().join(",") === requiredLanguages.sort().join(","), "translation set mismatch");
   const sourceUrls = [...new Set(create.body.match(/https?:\/\/[^\s)>\]]+/g) ?? [])];
-  for (const [language, text] of Object.entries(create.translations)) { assert(typeof text === "string" && text.length > 0 && Buffer.byteLength(text) <= 4 * 1024 * 1024, `${language} translation invalid`); assert(!/<(?:script|iframe|img|object|embed)\b/i.test(text) && !/!\[[^\]]*\]\([^)]+\)/.test(text), `${language} translation unsafe`); assert(sourceUrls.every((url) => text.includes(url)), `${language} translation missing URL`); }
-  manifest.articles.push(articleEntry(metadata)); manifest.articles.sort(articleSort);
+  const bodyTranslations = {};
+  const metadataTranslations = {};
+  for (const [language, value] of Object.entries(create.translations)) {
+    const localized = payload.schemaVersion === 2 ? value : { title: null, subtitle: null, description: null, body: value };
+    assert(localized && typeof localized === "object" && !Array.isArray(localized), `${language} translation invalid`);
+    if (payload.schemaVersion === 2) {
+      assert(Object.keys(localized).sort().join(",") === ["body", "description", "subtitle", "title"].join(","), `${language} translation fields mismatch`);
+      assert(typeof localized.title === "string" && localized.title.trim() && localized.title.length <= 120 && !/[\r\n]/.test(localized.title), `${language} title invalid`);
+      assert(typeof localized.subtitle === "string" && localized.subtitle.trim() && localized.subtitle.length <= 180 && !/[\r\n]/.test(localized.subtitle), `${language} subtitle invalid`);
+      assert(typeof localized.description === "string" && localized.description.trim() && localized.description.length <= 500 && !/[\r\n]/.test(localized.description), `${language} description invalid`);
+      assert(!/<[^>]+>|\[[^\]]+\]\([^)]+\)/.test(`${localized.title}\n${localized.subtitle}\n${localized.description}`), `${language} metadata translation unsafe`);
+      metadataTranslations[language] = { title: localized.title.trim(), subtitle: localized.subtitle.trim(), description: localized.description.trim() };
+    }
+    const text = localized.body;
+    assert(typeof text === "string" && text.length > 0 && Buffer.byteLength(text) <= 4 * 1024 * 1024, `${language} body translation invalid`);
+    assert(!/<(?:script|iframe|img|object|embed)\b/i.test(text) && !/!\[[^\]]*\]\([^)]+\)/.test(text), `${language} body translation unsafe`);
+    assert(sourceUrls.every((url) => text.includes(url)), `${language} translation missing URL`);
+    bodyTranslations[language] = text;
+  }
+  manifest.articles.push(articleEntry(metadata, payload.schemaVersion === 2 ? metadataTranslations : null)); manifest.articles.sort(articleSort);
   await writeText(path.join(root, "content/articles", `${articleId}.md`), create.canonicalMarkdown);
-  await writeText(path.join(root, "content/translations", `${articleId}.json`), `${JSON.stringify({ schemaVersion: 1, articleId, sourceDigest: sha256(create.canonicalMarkdown.replace(/\r\n?/g, "\n").trim() + "\n"), provider: create.provider?.name ?? "openai-compatible", model: create.provider?.model, translations: create.translations }, null, 2)}\n`);
-  await writeText(path.join(root, "website/articles", `${articleId}.html`), renderArticlePage(metadata, create.body, create.translations, site, manifest));
+  await writeText(path.join(root, "content/translations", `${articleId}.json`), `${JSON.stringify({ schemaVersion: payload.schemaVersion === 2 ? 2 : 1, articleId, sourceDigest: sha256(create.canonicalMarkdown.replace(/\r\n?/g, "\n").trim() + "\n"), provider: create.provider?.name ?? "openai-compatible", model: create.provider?.model, translations: payload.schemaVersion === 2 ? create.translations : bodyTranslations }, null, 2)}\n`);
+  await writeText(path.join(root, "website/articles", `${articleId}.html`), renderArticlePage(metadata, create.body, bodyTranslations, site, manifest));
   await writeCollections(manifest, site);
 } else {
   const deletion = payload.delete; assert(deletion && idPattern.test(deletion.articleId) && typeof deletion.confirmationTitle === "string", "invalid delete payload"); articleId = deletion.articleId;
