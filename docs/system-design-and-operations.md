@@ -556,7 +556,7 @@ PAT、OAuth token、AI key、Cloudflare token、署名password、未公開取材
 | `kizi-kougaku` | `c3e9a2f97f60258ea0a7e4b0707416db443650d2` | `7b7e9944d4f1457df106850091ca4a18faa30016` |
 | `kizi-other` | `cb6a657ecaa44efb0d016beb9ac8db1e348618b3` | `6d3f8e1a8c8f7e6ac16fe1f362c809a97ebabae0` |
 
-安全ref `codex/local-snapshot-2026-08-24-multilingual-metadata` も3リポジトリへpush済みです。監査時点で各refのtreeは対応する`main`と同一であり、再開時は原則として最新`main`を使います。このrefは復旧用であり、別の未統合機能があることを示しません。
+安全ref `codex/local-snapshot-2026-08-24-multilingual-metadata` も3リポジトリへpush済みです。各refのtreeは表に記録した「多言語対応を含む監査時`main`」commitと同一であり、再開時は原則として最新`main`を使います。このrefは復旧用であり、別の未統合機能があることを示しません。
 
 3リポジトリの`npm run check`、`git diff --check`、共通3文書のSHA-256一致に合格しました。macOS v0.3.0とAndroid v0.1.1のGitHub Release asset、target commit、GitHub記録のdigestも存在確認済みです。Android更新署名鍵2ファイルは所定のApplication Support配下にmode 0600で存在確認しましたが、暗号化した別媒体への二重保管は自動実施していないため、端末自体を廃棄・初期化する前に所有者が確認します。
 
