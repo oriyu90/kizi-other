@@ -546,6 +546,20 @@ PAT、OAuth token、AI key、Cloudflare token、署名password、未公開取材
 
 未統合作業の退避branchは完成版や本番deployを意味しません。再開時は記録されたcommitから新しい作業branchを作り、最新`main`へrebaseまたはcherry-pickし、競合解消と全品質gateを終えてから通常のreview・release手順へ進みます。
 
+### 21.5 2026-08-24保全監査記録
+
+この監査では、共通保守文書を3リポジトリへ反映し、同時に存在した多言語記事メタデータ・横長UIの変更も品質gate合格後にremoteへ保全済みであることを確認しました。
+
+| repository | 保守文書commit | 多言語対応を含む監査時`main` |
+| --- | --- | --- |
+| `kizi` | `84dd9e4b7eac13772623d84d4e54226c7bd726b7` | `1a0ba954acb36a9b257e0cc33e6aa2384f75b8da` |
+| `kizi-kougaku` | `c3e9a2f97f60258ea0a7e4b0707416db443650d2` | `7b7e9944d4f1457df106850091ca4a18faa30016` |
+| `kizi-other` | `cb6a657ecaa44efb0d016beb9ac8db1e348618b3` | `6d3f8e1a8c8f7e6ac16fe1f362c809a97ebabae0` |
+
+安全ref `codex/local-snapshot-2026-08-24-multilingual-metadata` も3リポジトリへpush済みです。監査時点で各refのtreeは対応する`main`と同一であり、再開時は原則として最新`main`を使います。このrefは復旧用であり、別の未統合機能があることを示しません。
+
+3リポジトリの`npm run check`、`git diff --check`、共通3文書のSHA-256一致に合格しました。macOS v0.3.0とAndroid v0.1.1のGitHub Release asset、target commit、GitHub記録のdigestも存在確認済みです。Android更新署名鍵2ファイルは所定のApplication Support配下にmode 0600で存在確認しましたが、暗号化した別媒体への二重保管は自動実施していないため、端末自体を廃棄・初期化する前に所有者が確認します。
+
 ## 22. Definition of Done
 
 この仕様変更全体は次をすべて満たした時だけ完了です。
