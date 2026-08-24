@@ -266,17 +266,17 @@ Publisher履歴へ次を追加します。
 commit作成後にpushできなかった場合はjournalのcommit SHAと`refs/kizi-publisher/recovery/<sha12>`を残します。再確認時に対象SHAがremote `main`と一致しなければR2確認へ進まず、recovery refを案内します。journalはfield、ISO日時、SHA、HTTPS URLを検証し、3 MiB/件・24 MiB/一覧を上限として壊れたrecordを隔離します。
 
 
-## 10A. Android Publisher v0.1.0の実装契約
+## 10A. Android Publisher v0.1.1の実装契約
 
 Android版の正本はprivate repository `oriyu90/kizi-publisher-android`です。Android 8.0（API 26）以降のphone、tablet、freeform window、Samsung DeX相当を対象とし、current window widthに応じてcompact（600 dp未満）、medium（600–839 dp）、expanded（840–1199 dp）、large（1200–1599 dp）、extra-large（1600 dp以上）をruntimeで再配置します。
 
-現行配布版は`v0.1.0`（commit `296bf4c873944cb25c77c2d2f607c9cf61e5899b`、Release `https://github.com/oriyu90/kizi-publisher-android/releases/tag/v0.1.0`）です。APK SHA-256は`5ebb506c1d2278a6c51dbc08122901641848577d81cc51c1c1d9903d82abb400`、AAB SHA-256は`1bdfc0f8cfeb10f11a9a3c5e85efba08c1894b581265ff75075493327408aa23`、署名証明書SHA-256は`29bc33a0240eb1f17dd5fb4748c1034a0b8663405a9c341ba192c520624a660f`です。個人端末向け自己署名で、物理DeX端末、Android 8〜15実機、foldableおよびRTLは未確認です。
+現行配布版は`v0.1.1`（commit `62c74af7e87d74a91187feacbc5f9a0838802955`、Release `https://github.com/oriyu90/kizi-publisher-android/releases/tag/v0.1.1`）です。APK SHA-256は`3b7f5fc31e85a6ee254d41a37ab6e0898a4af03786113b110217376b182c99c7`、AAB SHA-256は`81e7fbe4916e77c935cd0a4dc9c69eeecc19b32745db4ece75c417f92b35678f`、署名証明書SHA-256は`29bc33a0240eb1f17dd5fb4748c1034a0b8663405a9c341ba192c520624a660f`です。個人端末向け自己署名で、RTLとDeX相当のresizable windowはAPI 36.1 emulatorで確認済みです。物理DeX端末、Android 8〜15実機、foldableは未確認です。
 
 Android端末へNode.js、npm、Git cloneを同梱しません。公開時はGitHub Git Database APIで対象版のmainを親とするprivate candidate commitと`kizi-publisher-android/<operation UUID>`を作り、`Android Publisher Candidate / validate` workflowを起動します。workflowはoperation payloadのSHA-256、routing、front matter、翻訳、credential pattern、変更allowlistを検証し、Markdown、HTML、index、トップページ、RSS、sitemapを生成して`npm run check`を通します。成功時はmainを変更せず、親が元のmain SHAだけである単一commitを`kizi-publisher-validated/<operation UUID>`へ置きます。アプリはdirectoryを含む3リポジトリのmain SHAがpreview snapshotと一致することを再確認し、validated commitの親を照合してからGitHub refs APIの`force: false`で対象mainをfast-forwardします。
 
 GitHub認証の標準はOAuth Device Flowで、client secretをAPKへ入れません。個人所有端末向けの特例として、利用者が設定画面でPersonal access tokenを取り込む経路を認めます。この特例はcredentialのAPK埋め込みを認めるものではありません。OAuth access/refresh token、PAT、AI keyはAndroid Keystore内の別AES-256-GCM鍵で暗号化し、ソース、BuildConfig、APK asset、Git、Room、operation payload、ログ、Memo、backupへ保存しません。貼り付け値は取り込み直後にUIから消去し、無効なtokenはGitHub `/user`検証失敗時に暗号文と鍵aliasごと削除します。
 
-candidate ref、candidate commit、workflow run、source commit、snapshot、公開確認状態はRoom journalへ段階ごとに保存します。クラッシュ後はcandidate ref段階なら既存workflow runを先に照合して再開し、main反映後なら同じsource commitの`Publish to kizi / delivery`、`/api/publish-status`、統合記事URLまたは完全削除後のexact-match collection不在を再確認します。新しいcommitを重ねて成功扱いにせず、force pushを使いません。
+PREVIEWED原稿はapp-private atomic payloadとRoom journalへ保存し、操作履歴から記録済み公開日・ID・Issue・本文の完全一致を検証して復元できます。candidate ref、candidate commit、workflow run、source commit、snapshot、公開確認状態もRoom journalへ段階ごとに保存します。クラッシュ後はcandidate ref段階なら既存workflow runを先に照合して再開し、main反映後なら同じsource commitの`Publish to kizi / delivery`、`/api/publish-status`、統合記事URLまたは完全削除後のexact-match collection不在を再確認します。新しいcommitを重ねて成功扱いにせず、force pushを使いません。
 
 Android版Memoはapp internal storage、UTF-8、1 MiB上限、`AtomicFile`、symlink拒否です。700 ms debounce、focus解除、background移行、明示保存、Ctrl+Sに対応し、GitHub、記事リポジトリ、AI APIへ送信しません。Hallmark interaction stateはdefault、hover、focus、active、disabled、loading、error、successを分離し、visible controlは48×48 dp以上、focus ringは3 dpとします。
 ## 11. 公開状態と完了条件
