@@ -79,6 +79,22 @@ for (const article of manifest.articles) {
   if (seen.has(article.id)) errors.push(`記事IDが重複しています: ${article.id}`);
   seen.add(article.id);
 
+  if (article.translations !== undefined) {
+    const languages = article.translations && typeof article.translations === "object" && !Array.isArray(article.translations)
+      ? Object.keys(article.translations)
+      : [];
+    if (languages.length !== requiredTranslations.length || languages.some((language) => !requiredTranslations.includes(language))) {
+      errors.push(`${article.id}: index.jsonの翻訳は ${requiredTranslations.join(", ")} をすべて含めてください`);
+    }
+    for (const language of requiredTranslations) {
+      const translation = article.translations?.[language];
+      const fields = translation && typeof translation === "object" && !Array.isArray(translation) ? Object.keys(translation) : [];
+      if (fields.length !== 3 || !["title", "subtitle", "description"].every((field) => typeof translation?.[field] === "string" && translation[field].trim())) {
+        errors.push(`${article.id}: index.jsonの${language}翻訳にはtitle、subtitle、descriptionが必要です`);
+      }
+    }
+  }
+
   const articlePath = path.join(articlesDirectory, `${article.id}.html`);
   try {
     const html = await readFile(articlePath, "utf8");
