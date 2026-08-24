@@ -266,13 +266,13 @@ Publisher履歴へ次を追加します。
 commit作成後にpushできなかった場合はjournalのcommit SHAと`refs/kizi-publisher/recovery/<sha12>`を残します。再確認時に対象SHAがremote `main`と一致しなければR2確認へ進まず、recovery refを案内します。journalはfield、ISO日時、SHA、HTTPS URLを検証し、3 MiB/件・24 MiB/一覧を上限として壊れたrecordを隔離します。
 
 
-## 10A. Android Publisher v0.1.1の実装契約
+## 10A. Android Publisher v0.2.0の実装契約
 
 Android版の正本はprivate repository `oriyu90/kizi-publisher-android`です。Android 8.0（API 26）以降のphone、tablet、freeform window、Samsung DeX相当を対象とし、current window widthに応じてcompact（600 dp未満）、medium（600–839 dp）、expanded（840–1199 dp）、large（1200–1599 dp）、extra-large（1600 dp以上）をruntimeで再配置します。
 
-現行配布版は`v0.1.1`（commit `62c74af7e87d74a91187feacbc5f9a0838802955`、Release `https://github.com/oriyu90/kizi-publisher-android/releases/tag/v0.1.1`）です。APK SHA-256は`3b7f5fc31e85a6ee254d41a37ab6e0898a4af03786113b110217376b182c99c7`、AAB SHA-256は`81e7fbe4916e77c935cd0a4dc9c69eeecc19b32745db4ece75c417f92b35678f`、署名証明書SHA-256は`29bc33a0240eb1f17dd5fb4748c1034a0b8663405a9c341ba192c520624a660f`です。個人端末向け自己署名で、RTLとDeX相当のresizable windowはAPI 36.1 emulatorで確認済みです。物理DeX端末、Android 8〜15実機、foldableは未確認です。
+現行配布版は`v0.2.0`（commit `6a05e7edd38735d57b1ec1f6f0b69acd91ff1f3a`、Release `https://github.com/oriyu90/kizi-publisher-android/releases/tag/v0.2.0`）です。APK SHA-256は`bbd0ee808141a254077a7bf8af2df06fa23ee09078afe25e6ef8d9d3311935bd`、AAB SHA-256は`49948777f479ec0fe7cdf1c540886dc567d44408d26d50cc756961c85e13128b`、署名証明書SHA-256は`29bc33a0240eb1f17dd5fb4748c1034a0b8663405a9c341ba192c520624a660f`です。個人端末向け自己署名で、compact phone、tablet、DeX相当のresizable windowはAPI 36.1 emulatorで回帰確認済みです。物理DeX端末、Android 8〜15実機、foldableは未確認です。
 
-Android端末へNode.js、npm、Git cloneを同梱しません。公開時はGitHub Git Database APIで対象版のmainを親とするprivate candidate commitと`kizi-publisher-android/<operation UUID>`を作り、`Android Publisher Candidate / validate` workflowを起動します。workflowはoperation payloadのSHA-256、routing、front matter、翻訳、credential pattern、変更allowlistを検証し、Markdown、HTML、index、トップページ、RSS、sitemapを生成して`npm run check`を通します。成功時はmainを変更せず、親が元のmain SHAだけである単一commitを`kizi-publisher-validated/<operation UUID>`へ置きます。アプリはdirectoryを含む3リポジトリのmain SHAがpreview snapshotと一致することを再確認し、validated commitの親を照合してからGitHub refs APIの`force: false`で対象mainをfast-forwardします。
+Android端末へNode.js、npm、Git cloneを同梱しません。公開時はGitHub Git Database APIで対象版のmainを親とするprivate candidate commitと`kizi-publisher-android/<operation UUID>`を作り、`Android Publisher Candidate / validate` workflowを起動します。v0.2.0のcreate payload schema 2は`en`、`pt`、`de`、`zh-CN`、`ar`の各言語に`title`、`subtitle`、`description`、`body`だけを持ちます。workflowは5言語と4fieldの完全性、operation payloadのSHA-256、routing、front matter、翻訳、credential pattern、変更allowlistを検証し、Markdown、HTML、翻訳cache、多言語メタデータ付きindex、トップページ、RSS、sitemapを生成して`npm run check`を通します。schema 1はv0.1.1後方互換用に受理しますが、多言語カタログメタデータは生成しません。成功時はmainを変更せず、親が元のmain SHAだけである単一commitを`kizi-publisher-validated/<operation UUID>`へ置きます。アプリはdirectoryを含む3リポジトリのmain SHAがpreview snapshotと一致することを再確認し、validated commitの親を照合してからGitHub refs APIの`force: false`で対象mainをfast-forwardします。
 
 GitHub認証の標準はOAuth Device Flowで、client secretをAPKへ入れません。個人所有端末向けの特例として、利用者が設定画面でPersonal access tokenを取り込む経路を認めます。この特例はcredentialのAPK埋め込みを認めるものではありません。OAuth access/refresh token、PAT、AI keyはAndroid Keystore内の別AES-256-GCM鍵で暗号化し、ソース、BuildConfig、APK asset、Git、Room、operation payload、ログ、Memo、backupへ保存しません。貼り付け値は取り込み直後にUIから消去し、無効なtokenはGitHub `/user`検証失敗時に暗号文と鍵aliasごと削除します。
 
@@ -291,7 +291,7 @@ cd kizi-publisher-android
 git switch main
 git pull --ff-only
 git status --short
-gh release view v0.1.1 --repo oriyu90/kizi-publisher-android
+gh release view v0.2.0 --repo oriyu90/kizi-publisher-android
 ```
 
 `git status --short`は作業開始時に空でなければなりません。記事契約とremote runnerの統合試験には、同じ親directoryに最新`main`の`kizi-kougaku`と`kizi-other`を置きます。別配置では`KIZI_REPOSITORY_PARENT`を2リポジトリの親directoryへ設定します。Android側の変更前にAndroid repoの`AGENTS.md`、`README.md`、`docs/ARCHITECTURE.md`、`docs/THREAT_MODEL.md`、`docs/QUALITY_REPORT.md`、この共通設計、記事形式契約、macOS Publisherの現行仕様を照合します。
@@ -358,7 +358,7 @@ Service WorkerはUI shellだけを事前キャッシュします。記事一覧�
 
 kiziの共通UI、動的記事一覧、hero、メニュー、設定、お気に入り、あとで読む、パンくず、アクセシビリティ名、404は、IndexedDBで選択された言語を唯一の表示言語とします。動的な記事タイトル・副題・説明はR2カタログの任意`translations.<language>`を使い、フィールドがない既存記事だけ日本語メタデータへフォールバックします。共通UI文字列を日本語へフォールバックしてはいけません。
 
-macOS Publisher v0.3.0とAndroid Publisher v0.1.1より後の次版は、既存の本文翻訳処理を拡張し、`title`、`subtitle`、`description`を5言語へ翻訳して`website/articles/index.json`へ生成します。Markdown schemaVersion 2、AI入力front matter、採番、routingは変更しません。記事リポジトリのvalidatorとkizi deliveryは、`translations`が存在する場合に5言語と3フィールドが完全であることを検証します。移行完了まではフィールド自体を任意として後方互換を保ちます。
+macOS Publisher v0.3.0より後の次版とAndroid Publisher v0.2.0は、既存の本文翻訳処理を拡張し、`title`、`subtitle`、`description`を5言語へ翻訳して`website/articles/index.json`へ生成します。Markdown schemaVersion 2、AI入力front matter、採番、routingは変更しません。記事リポジトリのvalidatorとkizi deliveryは、`translations`が存在する場合に5言語と3フィールドが完全であることを検証します。移行完了まではフィールド自体を任意として後方互換を保ちます。
 
 ## 15. 対応ブラウザとアクセシビリティ
 
@@ -484,7 +484,7 @@ Publisherを含む5リポジトリのローカルcloneは使い捨てです。�
 | 工学記事 | `oriyu90/kizi-kougaku`の`main` | 同`main`からR2同期 |
 | 非工学記事 | `oriyu90/kizi-other`の`main` | 同`main`からR2同期 |
 | macOS Publisher | private `oriyu90/kizi-publisher-macos`の`main` | `v0.3.0`、commit `274798c4731f8a73a545b850d711b45f1e827a2d` |
-| Android Publisher | private `oriyu90/kizi-publisher-android`の`main` | `v0.1.1`、commit `62c74af7e87d74a91187feacbc5f9a0838802955` |
+| Android Publisher | private `oriyu90/kizi-publisher-android`の`main` | `v0.2.0`、commit `6a05e7edd38735d57b1ec1f6f0b69acd91ff1f3a` |
 
 `kizi/docs/mac-publisher-app-design.md`は実装前のv1案を失わないための履歴資料で、現行仕様の正本ではありません。既存記事編集、公開終了、版移転、revert専用UIなど、現行Releaseに存在しない案を実装済みと解釈してはいけません。
 
@@ -515,9 +515,9 @@ shasum -a 256 AGENTS.md docs/article-format.md docs/system-design-and-operations
 
 - 共通3リポジトリ: 依存関係を復元後、それぞれ`npm run check`。
 - macOS Publisher: Node.js/npmを用い、`npm ci`、`npm run quality`、`npm run dist:mac`。v0.3.0の再現は対象commitを使い、arm64/x64 DMGの署名、mount、起動、SHA-256をRelease記録と照合する。
-- Android Publisher: JDK 21、Android SDK/Build Tools 36、Node.jsを用い、`npm ci --ignore-scripts`、`./gradlew quality bundleRelease`、`./gradlew installDebug connectedDebugAndroidTest`、`npm run check:secrets`、`npm run test:runner`。v0.1.1の再現は対象commitと同じ外部署名鍵を使い、APK/AABと署名証明書のSHA-256をRelease記録と照合する。
+- Android Publisher: JDK 21、Android SDK/Build Tools 36、Node.jsを用い、`npm ci --ignore-scripts`、`./gradlew quality bundleRelease`、`./gradlew installDebug connectedDebugAndroidTest`、`npm run check:secrets`、`npm run test:runner`。v0.2.0の再現は対象commitと同じ外部署名鍵を使い、APK/AABと署名証明書のSHA-256をRelease記録と照合する。署名済みAPKはランダム化された署名byteにより別buildでhashが変わり得るため、照合対象はReleaseへ実際に添付したassetとする。
 
-Developer ID証明書とApple notarizationはv0.3.0に含まれません。Android v0.1.1は自己署名で、Google Play App Signingを使用していません。Release asset自体はGitHub Releaseから復元し、ローカルの`dist`、`release`、`build`を配布正本にしません。
+Developer ID証明書とApple notarizationはv0.3.0に含まれません。Android v0.2.0は自己署名で、Google Play App Signingを使用していません。Release asset自体はGitHub Releaseから復元し、ローカルの`dist`、`release`、`build`を配布正本にしません。
 
 ### 21.3 Git外で別途保全するもの
 
@@ -538,7 +538,7 @@ PAT、OAuth token、AI key、Cloudflare token、署名password、未公開取材
 
 1. 5リポジトリで`git status --short --untracked-files=all`を確認し、残す差分をすべてcommitする。
 2. `git log --oneline @{upstream}..HEAD`と`git branch -vv`で未push commitを確認する。未統合作業は`codex/`branchへpushし、branch名とcommit SHAをこの文書へ記録する。
-3. `gh release view`でmacOS v0.3.0とAndroid v0.1.1のasset、target commit、digestがGitHub上に存在することを確認する。
+3. `gh release view`でmacOS v0.3.0とAndroid v0.2.0のasset、target commit、digestがGitHub上に存在することを確認する。
 4. macOS/Android Publisherの操作履歴に未完了・push未確認の操作がないことを確認する。ある場合は同じcommitを再確認し、完了または明示的な復旧手順を記録する。
 5. Android更新署名鍵を別媒体から復元できることを検証する。必要なMemoはcredentialを含まないことを確認して別途保全する。
 6. 3共通文書のhash一致と各repoの品質gateを確認する。
@@ -559,6 +559,10 @@ PAT、OAuth token、AI key、Cloudflare token、署名password、未公開取材
 安全ref `codex/local-snapshot-2026-08-24-multilingual-metadata` も3リポジトリへpush済みです。各refのtreeは表に記録した「多言語対応を含む監査時`main`」commitと同一であり、再開時は原則として最新`main`を使います。このrefは復旧用であり、別の未統合機能があることを示しません。
 
 3リポジトリの`npm run check`、`git diff --check`、共通3文書のSHA-256一致に合格しました。macOS v0.3.0とAndroid v0.1.1のGitHub Release asset、target commit、GitHub記録のdigestも存在確認済みです。Android更新署名鍵2ファイルは所定のApplication Support配下にmode 0600で存在確認しましたが、暗号化した別媒体への二重保管は自動実施していないため、端末自体を廃棄・初期化する前に所有者が確認します。
+
+### 21.6 2026-08-24 Android v0.2.0更新記録
+
+Android Publisher v0.2.0でcandidate payload schema 2、本文と3項目の多言語メタデータ生成、5言語と4fieldの二重検証を導入しました。工学・非工学runnerはそれぞれcommit `a150bb70759cd039b2548a788bc5d1343807cc4b`と`ab3713ab23c6bd222aed287eca95781506c18080`でmainへ反映済みで、同commitの`Publish to kizi`は成功しています。Android private `Quality`、schema 2の両版生成、schema 1後方互換、完全削除、署名、v0.1.1からの更新install、phone/DeX UI、メモリ回帰を確認済みです。
 
 ## 22. Definition of Done
 
