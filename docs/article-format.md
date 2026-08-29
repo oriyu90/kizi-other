@@ -128,7 +128,7 @@ Publisher入力用front matterへAIが書くのは`title`、`subtitle`、`descri
 
 ### 多言語メタデータの生成契約
 
-現行Markdown schemaVersion 2は変更しません。macOS Publisher v0.4.0とAndroid Publisher v0.2.0は、本文翻訳に加えて`title`、`subtitle`、`description`を`en`、`pt`、`de`、`zh-CN`、`ar`へ翻訳し、`website/articles/index.json`の各記事へ次の生成フィールドを追加します。
+現行Markdown schemaVersion 2は変更しません。macOS Publisher v0.4.0とAndroid Publisher v0.3.0は、本文翻訳に加えて`title`、`subtitle`、`description`を`en`、`pt`、`de`、`zh-CN`、`ar`へ翻訳し、`website/articles/index.json`の各記事へ次の生成フィールドを追加します。
 
 ```json
 {
